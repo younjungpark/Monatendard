@@ -1,4 +1,4 @@
-.PHONY: sync download build smoke test lint verify package
+.PHONY: sync download build smoke test lint verify package proto
 
 sync:
 	uv sync --all-groups
@@ -26,3 +26,14 @@ verify:
 
 package:
 	uv run monatendard package --version 0.2.3
+
+PROTO_VARIANTS = Light Regular Bold
+
+proto:
+	for profile in proto-a proto-b proto-c; do \
+		uv run monatendard build --profile $$profile --variants $(PROTO_VARIANTS) && \
+		uv run monatendard build-nerd --profile $$profile --variants $(PROTO_VARIANTS) && \
+		uv run monatendard verify --profile $$profile && \
+		uv run monatendard verify --profile $$profile --nerd || exit 1; \
+	done
+	uv run python tools/render_comparison.py

@@ -6,7 +6,14 @@ import argparse
 import logging
 from pathlib import Path
 
-from monatendard.builder import DEFAULT_OUTPUT_DIR, build_variants
+from monatendard.builder import (
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PROFILE,
+    BuildProfile,
+    build_variants,
+    load_profile,
+    profile_names,
+)
 from monatendard.nerd import (
     DEFAULT_NERD_OUTPUT_DIR,
     DEFAULT_STANDARD_INPUT_DIR,
@@ -32,25 +39,47 @@ def _add_variant_selection(parser: argparse.ArgumentParser) -> None:
     )
 
 
+PROTOTYPE_OUTPUT_ROOT = Path("build") / "proto"
+
+
+def _add_profile(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--profile",
+        default=DEFAULT_PROFILE,
+        choices=profile_names(),
+        help="sources.lock.toml의 빌드 설정 (기본: default)",
+    )
+
+
+def _profile_root(profile: BuildProfile) -> Path:
+    """시제품은 정식 fonts/와 섞이지 않도록 build/proto/<이름> 아래에 둔다."""
+    if profile.name == DEFAULT_PROFILE:
+        return DEFAULT_OUTPUT_DIR
+    return PROTOTYPE_OUTPUT_ROOT / profile.name
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Monatendard 재현 가능 글꼴 빌드")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("fetch", help="고정 원본 다운로드, SHA256 검증 및 추출")
 
-    build = subparsers.add_parser("build", help="92.5% Monaspace와 Pretendard 병합")
+    build = subparsers.add_parser("build", help="Monaspace와 Pretendard 병합")
     _add_variant_selection(build)
-    build.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    _add_profile(build)
+    build.add_argument("--output-dir", type=Path)
 
     build_nerd = subparsers.add_parser(
         "build-nerd",
         help="일반 Monatendard에 Nerd Fonts 아이콘 병합",
     )
     _add_variant_selection(build_nerd)
-    build_nerd.add_argument("--input-dir", type=Path, default=DEFAULT_STANDARD_INPUT_DIR)
-    build_nerd.add_argument("--output-dir", type=Path, default=DEFAULT_NERD_OUTPUT_DIR)
+    _add_profile(build_nerd)
+    build_nerd.add_argument("--input-dir", type=Path)
+    build_nerd.add_argument("--output-dir", type=Path)
 
     verify = subparsers.add_parser("verify", help="생성 글꼴 자동 검증")
+    _add_profile(verify)
     verify.add_argument("--font-dir", type=Path)
     verify.add_argument("--nerd", action="store_true", help="Nerd 전용 TTF 검사")
     verify.add_argument("--reproducible", action="store_true", help="Regular 두 번 빌드 비교")
@@ -86,9 +115,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"검증 완료: {path}")
             return 0
 
+        profile = load_profile(getattr(args, "profile", DEFAULT_PROFILE))
+        root = _profile_root(profile)
+
         if args.command == "build":
             variants = _selected_variants(args.variants, args.all)
-            stats = build_variants(variants, args.output_dir)
+            stats = build_variants(variants, args.output_dir or root, profile)
             for result in stats:
                 print(
                     f"생성 완료: {result.output_path} "
@@ -100,8 +132,9 @@ def main(argv: list[str] | None = None) -> int:
             variants = _selected_variants(args.variants, args.all)
             stats = build_nerd_variants(
                 variants,
-                input_dir=args.input_dir,
-                output_dir=args.output_dir,
+                input_dir=args.input_dir or root / DEFAULT_STANDARD_INPUT_DIR.name,
+                output_dir=args.output_dir or root / DEFAULT_NERD_OUTPUT_DIR.name,
+                profile=profile,
             )
             for result in stats:
                 print(
@@ -112,10 +145,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "verify":
-            font_dir = args.font_dir or (
-                DEFAULT_NERD_OUTPUT_DIR if args.nerd else DEFAULT_OUTPUT_DIR / "ttf"
+            font_dir = args.font_dir or root / (
+                DEFAULT_NERD_OUTPUT_DIR.name if args.nerd else DEFAULT_STANDARD_INPUT_DIR.name
             )
-            failures = verify_directory(font_dir, nerd=args.nerd)
+            failures = verify_directory(font_dir, nerd=args.nerd, profile=profile)
             for path, errors in failures.items():
                 for error in errors:
                     print(f"실패: {path}: {error}")
@@ -123,10 +156,13 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print(f"검증 완료: {font_dir}")
             if args.reproducible:
-                reproducibility_check = (
-                    verify_nerd_reproducible if args.nerd else verify_reproducible
-                )
-                same, first, second = reproducibility_check()
+                if args.nerd:
+                    same, first, second = verify_nerd_reproducible(
+                        profile=profile,
+                        input_dir=root / DEFAULT_STANDARD_INPUT_DIR.name,
+                    )
+                else:
+                    same, first, second = verify_reproducible(profile=profile)
                 print(f"재현성 SHA256: {first}")
                 if not same:
                     print(f"재현성 실패: second={second}")

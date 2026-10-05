@@ -11,19 +11,19 @@ from fontTools.ttLib import TTFont
 
 from monatendard.builder import (
     DEFAULT_OUTPUT_DIR,
+    BuildProfile,
     _fit_cjk_transform,
     _glyph_bounds,
     _redraw_scaled_glyph,
     _safe_vertical_bounds,
     _set_name,
     derive_monospace_advance,
+    load_profile,
 )
 from monatendard.sources import (
-    LOCK_PATH,
     NERD_FONTS_DIR,
     NERD_SYMBOLS_FILENAME,
     Variant,
-    load_lock,
 )
 
 logger = logging.getLogger(__name__)
@@ -161,15 +161,22 @@ def merge_nerd_symbols(font: TTFont, symbols_font: TTFont, latin_advance: int) -
     return mapped
 
 
-def update_nerd_metadata(font: TTFont, variant: Variant, project_version: str) -> None:
+def update_nerd_metadata(
+    font: TTFont,
+    variant: Variant,
+    project_version: str,
+    *,
+    family_name: str = NERD_FAMILY_NAME,
+    file_prefix: str = NERD_FILE_PREFIX,
+) -> None:
     """일반판과 충돌하지 않는 Nerd 전용 패밀리 이름을 설정한다."""
     postscript_subfamily = variant.subfamily_name.replace(" ", "")
-    postscript_name = f"{NERD_FILE_PREFIX}-{postscript_subfamily}"
+    postscript_name = f"{file_prefix}-{postscript_subfamily}"
     values = {
-        1: NERD_FAMILY_NAME,
+        1: family_name,
         2: variant.subfamily_name,
         3: f"{postscript_name};{project_version}",
-        4: f"{NERD_FAMILY_NAME} {variant.subfamily_name}",
+        4: f"{family_name} {variant.subfamily_name}",
         5: f"Version {project_version}",
         6: postscript_name,
         13: (
@@ -177,7 +184,7 @@ def update_nerd_metadata(font: TTFont, variant: Variant, project_version: str) -
             "Nerd Fonts Symbols Only glyphs are distributed under the MIT License."
         ),
         14: "https://github.com/younjungpark/Monatendard",
-        16: NERD_FAMILY_NAME,
+        16: family_name,
         17: variant.subfamily_name,
     }
     for name_id, value in values.items():
@@ -191,10 +198,12 @@ def build_nerd_font(
     output_dir: Path = DEFAULT_NERD_OUTPUT_DIR,
     symbols_path: Path = NERD_FONTS_DIR / NERD_SYMBOLS_FILENAME,
     project_version: str | None = None,
+    profile: BuildProfile | None = None,
 ) -> NerdBuildStats:
     """기존 Monatendard 한 변형에 Nerd 아이콘을 병합한다."""
-    version = project_version or str(load_lock(LOCK_PATH)["project"]["version"])
-    base_path = input_dir / f"Monatendard-{variant.output_suffix}.ttf"
+    profile = profile or load_profile()
+    version = project_version or profile.version
+    base_path = input_dir / f"{profile.file_prefix}-{variant.output_suffix}.ttf"
     for path in (base_path, symbols_path):
         if not path.exists():
             raise FileNotFoundError(
@@ -207,10 +216,16 @@ def build_nerd_font(
     try:
         latin_advance = derive_monospace_advance(target)
         mapped = merge_nerd_symbols(target, symbols, latin_advance)
-        update_nerd_metadata(target, variant, version)
+        update_nerd_metadata(
+            target,
+            variant,
+            version,
+            family_name=profile.nerd_family,
+            file_prefix=profile.nerd_file_prefix,
+        )
         target.recalcTimestamp = False
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{NERD_FILE_PREFIX}-{variant.output_suffix}.ttf"
+        output_path = output_dir / f"{profile.nerd_file_prefix}-{variant.output_suffix}.ttf"
         target.save(output_path, reorderTables=False)
     finally:
         target.close()
@@ -231,9 +246,11 @@ def build_nerd_variants(
     *,
     input_dir: Path = DEFAULT_STANDARD_INPUT_DIR,
     output_dir: Path = DEFAULT_NERD_OUTPUT_DIR,
+    profile: BuildProfile | None = None,
 ) -> list[NerdBuildStats]:
     """선택한 모든 변형의 Nerd 전용 TTF를 생성한다."""
+    profile = profile or load_profile()
     return [
-        build_nerd_font(variant, input_dir=input_dir, output_dir=output_dir)
+        build_nerd_font(variant, input_dir=input_dir, output_dir=output_dir, profile=profile)
         for variant in variants
     ]

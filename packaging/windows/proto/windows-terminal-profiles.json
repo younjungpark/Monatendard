@@ -1,0 +1,39 @@
+[
+    {
+        "guid": "{23e1d138-9f03-4d8c-b639-436f15e7bf8b}",
+        "name": "PowerShell (Proto A)",
+        "commandline": "pwsh.exe -NoLogo",
+        "startingDirectory": "C:\\work",
+        "font": {
+            "face": "Monatendard Proto A Nerd Font Mono",
+            "size": 15,
+            "weight": "light",
+            "cellHeight": "1.5"
+        }
+    },
+    {
+        "guid": "{1cd06b81-b1f5-42b5-872c-fca14b70c522}",
+        "name": "PowerShell (Proto B)",
+        "commandline": "pwsh.exe -NoLogo",
+        "startingDirectory": "C:\\work",
+        "font": {
+            "face": "Monatendard Proto B Nerd Font Mono",
+            "size": 15,
+            "weight": "light",
+            "cellHeight": "1.5"
+        }
+    },
+    {
+        "guid": "{5af422b1-a361-4bd3-87c4-a9e0d4bb0fe5}",
+        "name": "PowerShell (Proto C)",
+        "commandline": "pwsh.exe -NoLogo",
+        "startingDirectory": "C:\\work",
+        "font": {
+            "face": "Monatendard Proto C Nerd Font Mono",
+            "size": 15,
+            "weight": "light",
+            "cellHeight": "1.5",
+            "cellWidth": "0.6"
+        }
+    }
+]

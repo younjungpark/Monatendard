@@ -1,4 +1,4 @@
-"""Monaspace Neon을 92.5%로 조정하고 Pretendard 한글을 병합한다."""
+"""Monaspace Neon을 설정한 배율로 조정하고 Pretendard 한글을 병합한다."""
 
 from __future__ import annotations
 
@@ -87,6 +87,68 @@ JONGSEONG_MAP = {
 JAMO_COMPATIBILITY_MAP = CHOSEONG_MAP | JUNGSEONG_MAP | JONGSEONG_MAP
 
 
+DEFAULT_PROFILE = "default"
+
+
+@dataclass(frozen=True)
+class BuildProfile:
+    """패밀리 이름과 영문·한글 배율 묶음. 기본값은 lock의 `[project]`다."""
+
+    name: str
+    family: str
+    version: str
+    latin_horizontal_scale: float
+    latin_advance_em: float
+    cjk_horizontal_scale: float
+    cjk_vertical_scale: float
+
+    @property
+    def file_prefix(self) -> str:
+        return self.family.replace(" ", "")
+
+    @property
+    def nerd_family(self) -> str:
+        return f"{self.family} Nerd Font Mono"
+
+    @property
+    def nerd_file_prefix(self) -> str:
+        return f"{self.file_prefix}NFM"
+
+    @property
+    def keeps_latin_outlines(self) -> bool:
+        """영문 윤곽을 누르지 않는 설정인지 판단한다. 셀 폭은 빌드 시 원본과 대조한다."""
+        return self.latin_horizontal_scale == 1.0
+
+
+def load_profile(name: str = DEFAULT_PROFILE, lock: dict | None = None) -> BuildProfile:
+    """lock 파일에서 이름으로 빌드 설정을 읽는다."""
+    lock = lock or load_lock(LOCK_PATH)
+    if name == DEFAULT_PROFILE:
+        values = lock["project"]
+    else:
+        prototypes = lock.get("prototypes", {})
+        if name not in prototypes:
+            raise ValueError(
+                f"지원하지 않는 profile: {name}. "
+                f"지원 목록: {', '.join([DEFAULT_PROFILE, *prototypes])}"
+            )
+        values = prototypes[name]
+    return BuildProfile(
+        name=name,
+        family=str(values["family"]),
+        version=str(values["version"]),
+        latin_horizontal_scale=float(values["latin_horizontal_scale"]),
+        latin_advance_em=float(values["latin_advance_em"]),
+        cjk_horizontal_scale=float(values["cjk_horizontal_scale"]),
+        cjk_vertical_scale=float(values["cjk_vertical_scale"]),
+    )
+
+
+def profile_names(lock: dict | None = None) -> list[str]:
+    lock = lock or load_lock(LOCK_PATH)
+    return [DEFAULT_PROFILE, *lock.get("prototypes", {})]
+
+
 @dataclass(frozen=True)
 class BuildStats:
     """한 파일의 변환 결과."""
@@ -171,7 +233,11 @@ def scale_latin_horizontally(
     *,
     connecting_font: TTFont | None = None,
 ) -> int:
-    """Monaspace 윤곽을 축소하고 지정한 advance 안에 중앙 정렬한다."""
+    """Monaspace 윤곽을 축소하고 지정한 advance 안에 중앙 정렬한다.
+
+    배율이 1이고 advance가 원본과 같으면 윤곽과 힌팅을 그대로 둔다. 이때도 이탤릭의
+    셀 접합 글리프는 정체에서 가져와 다시 그린다.
+    """
     if not 0 < outline_scale <= 1:
         raise ValueError(f"가로 배율은 0보다 크고 1 이하여야 합니다: {outline_scale}")
     if not 0 < advance_em <= 1:
@@ -187,6 +253,7 @@ def scale_latin_horizontally(
     source_advance = derive_monospace_advance(pristine_font)
     target_advance = round(cast("Any", font["head"]).unitsPerEm * advance_em)
     advance_scale = target_advance / source_advance
+    keeps_outlines = outline_scale == 1 and target_advance == source_advance
     target_cmap = pristine_font.getBestCmap() or {}
     connecting_cmap = connecting_source.getBestCmap() or {}
     connecting_glyphs = {
@@ -196,6 +263,8 @@ def scale_latin_horizontally(
     }
     for glyph_name in pristine_font.getGlyphOrder():
         connecting_name = connecting_glyphs.get(glyph_name)
+        if keeps_outlines and (connecting_name is None or connecting_source is pristine_font):
+            continue
         if connecting_name is None:
             glyph_source_set = source_glyph_set
             source_name = glyph_name
@@ -217,9 +286,10 @@ def scale_latin_horizontally(
         )
         hmtx.metrics[glyph_name] = (scaled_advance, scaled_lsb)
 
-    for hint_table in ("fpgm", "prep", "cvt "):
-        if hint_table in font:
-            del font[hint_table]
+    if not keeps_outlines:
+        for hint_table in ("fpgm", "prep", "cvt "):
+            if hint_table in font:
+                del font[hint_table]
 
     latin_advance = derive_monospace_advance(font)
     cast("Any", font["hhea"]).advanceWidthMax = max(width for width, _ in hmtx.metrics.values())
@@ -340,6 +410,7 @@ def merge_cjk(
         cast("Any", font["head"]).unitsPerEm / cast("Any", cjk_font["head"]).unitsPerEm
     )
 
+    uniform = horizontal_scale == vertical_scale
     copied = 0
     codepoints = {code for code in cmap if is_cjk(code)}
     codepoints.update(JAMO_COMPATIBILITY_MAP)
@@ -352,14 +423,25 @@ def merge_cjk(
             continue
         target_name = f"mduni{codepoint:04X}"
         source_bounds = _glyph_bounds(cjk_glyph_set, source_name)
-        scale_x, scale_y, shift_x = _fit_cjk_transform_xy(
-            source_bounds,
-            normalized_scale_x=normalized_scale * horizontal_scale,
-            normalized_scale_y=normalized_scale * vertical_scale,
-            target_advance=target_advance,
-            safe_ymin=safe_ymin,
-            safe_ymax=safe_ymax,
-        )
+        if uniform:
+            # 셀을 넘는 글자는 가로·세로를 함께 줄여 원래 비율을 지킨다.
+            scale_x, shift_x = _fit_cjk_transform(
+                source_bounds,
+                normalized_scale=normalized_scale * horizontal_scale,
+                target_advance=target_advance,
+                safe_ymin=safe_ymin,
+                safe_ymax=safe_ymax,
+            )
+            scale_y = scale_x
+        else:
+            scale_x, scale_y, shift_x = _fit_cjk_transform_xy(
+                source_bounds,
+                normalized_scale_x=normalized_scale * horizontal_scale,
+                normalized_scale_y=normalized_scale * vertical_scale,
+                target_advance=target_advance,
+                safe_ymin=safe_ymin,
+                safe_ymax=safe_ymax,
+            )
         glyph = _redraw_scaled_glyph(
             cjk_glyph_set, source_name, scale_x, scale_y, shift_x
         )
@@ -397,15 +479,20 @@ def _set_name(font: TTFont, name_id: int, value: str) -> None:
     name_table.setName(value, name_id, 1, 0, 0)
 
 
-def update_metadata(font: TTFont, variant: Variant, project_version: str) -> None:
+def update_metadata(
+    font: TTFont,
+    variant: Variant,
+    project_version: str,
+    family_name: str = FAMILY_NAME,
+) -> None:
     """패밀리·스타일·버전·라이선스 메타데이터를 Monatendard로 고정한다."""
-    postscript_family = FAMILY_NAME.replace(" ", "")
+    postscript_family = family_name.replace(" ", "")
     postscript_subfamily = variant.subfamily_name.replace(" ", "")
-    full_name = f"{FAMILY_NAME} {variant.subfamily_name}"
+    full_name = f"{family_name} {variant.subfamily_name}"
     postscript_name = f"{postscript_family}-{postscript_subfamily}"
 
     values = {
-        1: FAMILY_NAME,
+        1: family_name,
         2: variant.subfamily_name,
         3: f"{postscript_name};{project_version}",
         4: full_name,
@@ -416,7 +503,7 @@ def update_metadata(font: TTFont, variant: Variant, project_version: str) -> Non
             "under the SIL Open Font License, Version 1.1."
         ),
         14: "https://openfontlicense.org",
-        16: FAMILY_NAME,
+        16: family_name,
         17: variant.subfamily_name,
     }
     for name_id, value in values.items():
@@ -458,14 +545,12 @@ def build_font(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     horizontal_scale: float | None = None,
     project_version: str | None = None,
+    profile: BuildProfile | None = None,
 ) -> BuildStats:
     """한 variant를 TTF와 WOFF2로 생성한다."""
-    lock = load_lock(LOCK_PATH)
-    scale = horizontal_scale or float(lock["project"]["latin_horizontal_scale"])
-    latin_advance_em = float(lock["project"]["latin_advance_em"])
-    cjk_horizontal_scale = float(lock["project"]["cjk_horizontal_scale"])
-    cjk_vertical_scale = float(lock["project"]["cjk_vertical_scale"])
-    version = project_version or str(lock["project"]["version"])
+    profile = profile or load_profile()
+    scale = horizontal_scale or profile.latin_horizontal_scale
+    version = project_version or profile.version
     latin_path = MONASPACE_DIR / variant.latin_filename
     connecting_path = (
         MONASPACE_DIR / f"MonaspaceNeonFrozen-{variant.weight_name}.ttf"
@@ -488,25 +573,25 @@ def build_font(
             target,
             pristine,
             scale,
-            latin_advance_em,
-            connecting_font=connecting,
+            profile.latin_advance_em,
+            connecting_font=connecting if variant.is_italic else None,
         )
         copied = merge_cjk(
             target,
             cjk,
             latin_advance,
-            cjk_horizontal_scale,
-            cjk_vertical_scale,
+            profile.cjk_horizontal_scale,
+            profile.cjk_vertical_scale,
         )
-        update_metadata(target, variant, version)
+        update_metadata(target, variant, version, profile.family)
         target.recalcTimestamp = False
 
         ttf_dir = output_dir / "ttf"
         web_dir = output_dir / "webfont"
         ttf_dir.mkdir(parents=True, exist_ok=True)
         web_dir.mkdir(parents=True, exist_ok=True)
-        ttf_path = ttf_dir / f"{FAMILY_NAME}-{variant.output_suffix}.ttf"
-        woff2_path = web_dir / f"{FAMILY_NAME}-{variant.output_suffix}.woff2"
+        ttf_path = ttf_dir / f"{profile.file_prefix}-{variant.output_suffix}.ttf"
+        woff2_path = web_dir / f"{profile.file_prefix}-{variant.output_suffix}.woff2"
         target.save(ttf_path, reorderTables=False)
 
         web_font = TTFont(ttf_path, recalcTimestamp=False)
@@ -531,16 +616,22 @@ def build_font(
     return BuildStats(ttf_path, copied, latin_advance, latin_advance * 2)
 
 
-def write_web_css(output_dir: Path, variants: list[Variant]) -> Path:
+def write_web_css(
+    output_dir: Path,
+    variants: list[Variant],
+    profile: BuildProfile | None = None,
+) -> Path:
     """빌드된 WOFF2를 위한 @font-face CSS를 만든다."""
+    profile = profile or load_profile()
     blocks = []
     for variant in variants:
         blocks.append(
             "\n".join(
                 [
                     "@font-face {",
-                    f"  font-family: '{FAMILY_NAME}';",
-                    f"  src: url('./{FAMILY_NAME}-{variant.output_suffix}.woff2') format('woff2');",
+                    f"  font-family: '{profile.family}';",
+                    f"  src: url('./{profile.file_prefix}-{variant.output_suffix}.woff2') "
+                    "format('woff2');",
                     f"  font-weight: {variant.css_weight};",
                     f"  font-style: {variant.style};",
                     "  font-display: swap;",
@@ -548,7 +639,7 @@ def write_web_css(output_dir: Path, variants: list[Variant]) -> Path:
                 ]
             )
         )
-    path = output_dir / "webfont" / "monatendard.css"
+    path = output_dir / "webfont" / f"{profile.file_prefix.lower()}.css"
     path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
     return path
 
@@ -556,10 +647,14 @@ def write_web_css(output_dir: Path, variants: list[Variant]) -> Path:
 def build_variants(
     variants: list[Variant],
     output_dir: Path = DEFAULT_OUTPUT_DIR,
+    profile: BuildProfile | None = None,
 ) -> list[BuildStats]:
     """선택한 variant를 순서대로 빌드한다."""
-    stats = [build_font(variant, output_dir=output_dir) for variant in variants]
-    write_web_css(output_dir, variants)
+    profile = profile or load_profile()
+    stats = [
+        build_font(variant, output_dir=output_dir, profile=profile) for variant in variants
+    ]
+    write_web_css(output_dir, variants, profile)
     return stats
 
 

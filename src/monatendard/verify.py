@@ -9,15 +9,14 @@ from fontTools.ttLib import TTFont
 
 from monatendard.builder import (
     ASCII_SAMPLE,
-    FAMILY_NAME,
     REQUIRED_HANGUL,
+    BuildProfile,
     _glyph_bounds,
     build_font,
+    load_profile,
 )
 from monatendard.nerd import (
     CENTERED_NERD_CODEPOINTS,
-    NERD_FAMILY_NAME,
-    NERD_FILE_PREFIX,
     NERD_ICON_VERTICAL_OFFSET_EM,
     REQUIRED_NERD_CODEPOINTS,
     build_nerd_font,
@@ -25,6 +24,8 @@ from monatendard.nerd import (
 from monatendard.sources import VARIANTS_BY_SUFFIX
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+HINTING_TABLES = ("fpgm", "prep", "cvt ")
+HINTED_SAMPLE = "Aao"
 REQUIRED_TABLES = {"cmap", "glyf", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post"}
 LIGATURE_FEATURES = {"liga", "calt", *(f"ss{number:02d}" for number in range(1, 11))}
 EDGE_JOIN_REQUIREMENTS = {
@@ -43,8 +44,25 @@ def _name_values(font: TTFont, name_id: int) -> set[str]:
     return values
 
 
-def verify_font(path: Path) -> list[str]:
+def _check_latin_hinting(font: TTFont, cmap: dict[int, str]) -> list[str]:
+    """원본 영문 힌팅 테이블과 글리프 명령어가 남아 있는지 확인한다."""
+    errors: list[str] = []
+    missing = [tag.strip() for tag in HINTING_TABLES if tag not in font]
+    if missing:
+        errors.append(f"영문 힌팅 테이블 누락: {', '.join(missing)}")
+    glyf = font["glyf"]
+    for char in HINTED_SAMPLE:
+        glyph_name = cmap.get(ord(char))
+        glyph = glyf[glyph_name] if glyph_name is not None else None
+        program = getattr(glyph, "program", None)
+        if program is None or not program.getBytecode():
+            errors.append(f"영문 '{char}' 글리프에 힌팅 명령어가 없습니다.")
+    return errors
+
+
+def verify_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
     """한 글꼴을 검사하고 실패 사유를 반환한다."""
+    profile = profile or load_profile()
     errors: list[str] = []
     try:
         font = TTFont(path)
@@ -57,10 +75,14 @@ def verify_font(path: Path) -> list[str]:
         if missing_tables:
             errors.append(f"필수 테이블 누락: {', '.join(sorted(missing_tables))}")
 
-        for name_id, label in ((1, "Family"), (4, "Full"), (6, "PostScript")):
+        for name_id, label, expected in (
+            (1, "Family", profile.family),
+            (4, "Full", profile.family),
+            (6, "PostScript", profile.file_prefix),
+        ):
             values = _name_values(font, name_id)
-            if not values or any(FAMILY_NAME not in value for value in values):
-                errors.append(f"{label} name이 Monatendard 규칙과 다릅니다: {sorted(values)}")
+            if not values or any(expected not in value for value in values):
+                errors.append(f"{label} name이 {expected} 규칙과 다릅니다: {sorted(values)}")
 
         licenses = _name_values(font, 13)
         if not licenses or not any("SIL Open Font License" in value for value in licenses):
@@ -77,6 +99,12 @@ def verify_font(path: Path) -> list[str]:
             errors.append(f"대표 영문 advance가 단일 값이 아닙니다: {sorted(ascii_widths)}")
         else:
             latin_advance = next(iter(ascii_widths))
+            expected_advance = round(font["head"].unitsPerEm * profile.latin_advance_em)
+            if latin_advance != expected_advance:
+                errors.append(
+                    f"영문 advance={latin_advance}, expected={expected_advance} "
+                    f"({profile.latin_advance_em:.3f}em)"
+                )
             for codepoint in REQUIRED_HANGUL:
                 glyph_name = cmap.get(codepoint)
                 if glyph_name is None:
@@ -119,6 +147,9 @@ def verify_font(path: Path) -> list[str]:
             if not tags & LIGATURE_FEATURES:
                 errors.append(f"리게이처 feature가 없습니다: {sorted(tags)}")
 
+        if profile.keeps_latin_outlines:
+            errors.extend(_check_latin_hinting(font, cmap))
+
         if not cast_fixed_pitch(font):
             errors.append("고정폭 메타데이터가 설정되지 않았습니다.")
     finally:
@@ -126,9 +157,10 @@ def verify_font(path: Path) -> list[str]:
     return errors
 
 
-def verify_nerd_font(path: Path) -> list[str]:
+def verify_nerd_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
     """일반 글꼴 규칙과 Nerd 전용 패밀리·아이콘·폭을 함께 검사한다."""
-    errors = verify_font(path)
+    profile = profile or load_profile()
+    errors = verify_font(path, profile)
     try:
         font = TTFont(path)
         font.ensureDecompiled()
@@ -137,7 +169,7 @@ def verify_nerd_font(path: Path) -> list[str]:
 
     try:
         families = _name_values(font, 16) or _name_values(font, 1)
-        if families != {NERD_FAMILY_NAME}:
+        if families != {profile.nerd_family}:
             errors.append(f"Nerd 패밀리 이름이 다릅니다: {sorted(families)}")
 
         cmap = font.getBestCmap() or {}
@@ -193,18 +225,27 @@ def cast_fixed_pitch(font: TTFont) -> bool:
     return bool(font["post"].isFixedPitch) and font["OS/2"].panose.bProportion == 9
 
 
-def verify_directory(font_dir: Path, *, nerd: bool = False) -> dict[Path, list[str]]:
+def verify_directory(
+    font_dir: Path,
+    *,
+    nerd: bool = False,
+    profile: BuildProfile | None = None,
+) -> dict[Path, list[str]]:
     """디렉터리의 모든 TTF를 검사한다."""
-    pattern = f"{NERD_FILE_PREFIX}-*.ttf" if nerd else "Monatendard-*.ttf"
+    profile = profile or load_profile()
+    prefix = profile.nerd_file_prefix if nerd else profile.file_prefix
     verifier = verify_nerd_font if nerd else verify_font
-    paths = sorted(font_dir.glob(pattern))
+    paths = sorted(font_dir.glob(f"{prefix}-*.ttf"))
     if not paths:
-        label = "Monatendard Nerd" if nerd else "Monatendard"
+        label = profile.nerd_family if nerd else profile.family
         return {font_dir: [f"검사할 {label} TTF가 없습니다."]}
-    return {path: errors for path in paths if (errors := verifier(path))}
+    return {path: errors for path in paths if (errors := verifier(path, profile))}
 
 
-def verify_reproducible(variant_name: str = "Regular") -> tuple[bool, str, str]:
+def verify_reproducible(
+    variant_name: str = "Regular",
+    profile: BuildProfile | None = None,
+) -> tuple[bool, str, str]:
     """같은 입력을 두 번 빌드해 TTF SHA256이 같은지 확인한다."""
     from monatendard.sources import sha256
 
@@ -216,14 +257,18 @@ def verify_reproducible(variant_name: str = "Regular") -> tuple[bool, str, str]:
         dir=temporary_root,
     ) as temporary:
         root = Path(temporary)
-        first = build_font(variant, output_dir=root / "first").output_path
-        second = build_font(variant, output_dir=root / "second").output_path
+        first = build_font(variant, output_dir=root / "first", profile=profile).output_path
+        second = build_font(variant, output_dir=root / "second", profile=profile).output_path
         first_hash = sha256(first)
         second_hash = sha256(second)
     return first_hash == second_hash, first_hash, second_hash
 
 
-def verify_nerd_reproducible(variant_name: str = "Regular") -> tuple[bool, str, str]:
+def verify_nerd_reproducible(
+    variant_name: str = "Regular",
+    profile: BuildProfile | None = None,
+    input_dir: Path | None = None,
+) -> tuple[bool, str, str]:
     """같은 일반판 입력에서 Nerd TTF를 두 번 만들어 SHA256을 비교한다."""
     from monatendard.sources import sha256
 
@@ -235,8 +280,11 @@ def verify_nerd_reproducible(variant_name: str = "Regular") -> tuple[bool, str, 
         dir=temporary_root,
     ) as temporary:
         root = Path(temporary)
-        first = build_nerd_font(variant, output_dir=root / "first").output_path
-        second = build_nerd_font(variant, output_dir=root / "second").output_path
+        options = {"profile": profile}
+        if input_dir is not None:
+            options["input_dir"] = input_dir
+        first = build_nerd_font(variant, output_dir=root / "first", **options).output_path
+        second = build_nerd_font(variant, output_dir=root / "second", **options).output_path
         first_hash = sha256(first)
         second_hash = sha256(second)
     return first_hash == second_hash, first_hash, second_hash
