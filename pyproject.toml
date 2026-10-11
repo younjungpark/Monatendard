@@ -1,6 +1,6 @@
 [project]
 name = "monatendard"
-version = "0.2.3"
+version = "0.3.0"
 description = "Monaspace Neon과 Pretendard를 결합한 한글 코딩 글꼴 빌드 도구"
 readme = "README.ko.md"
 requires-python = ">=3.11"

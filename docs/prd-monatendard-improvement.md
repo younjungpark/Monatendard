@@ -8,7 +8,7 @@ Monatendard의 영문을 Monaspace Neon 원본 그대로 되돌리고 한글을 
 
 시제품은 대조군이다. Monaspace는 셀이 넓고 소문자가 낮아 한글과의 크기 관계가 구조적으로 어긋나므로, 한글 이질감은 시제품으로 풀리지 않을 가능성이 있다. 순서는 시제품 확인이 먼저다. 시제품으로 개선 방향이 보이지 않을 때 다른 영문 글꼴과의 조합을 찾는다.
 
-현재 상태: 1단계 시제품을 만들어 설치했고 판정을 기다린다. 진행 방법은 [시제품 판정 안내](proto-judgement.md)를 본다.
+현재 상태: 판정 완료(2026-10-11). Proto A를 v0.3.0 본판으로 정했다. `[project]`가 A 설정(영문 원본·0.620em, 한글 균등 1.15)이고, C는 `--profile compact` 직접 빌드 옵션으로 남겼다. 판정 경과는 [시제품 판정 안내](proto-judgement.md)를 본다.
 
 ## 배경과 문제
 
@@ -171,6 +171,11 @@ Monaspace가 탈락할 경우 새 폰트의 영문 기반은 아래 네 가지�
 
 - 한글 자동 힌팅 실험
 - v0.3.0의 전체 범위: 이탤릭, 14개 스타일, 웹폰트, 설치 패키지, README 수치
+    - 패밀리는 하나만 낸다(A 또는 C → **A로 확정, 2026-10-11**). 두 패밀리 동시 지원은 유지 비용과 랜딩 페이지 개편 부담 때문에 하지 않는다(2026-10-06).
+    - README(영문·한국어): 원본 비교 표, 빌드 과정 설명(92.5% 압축, 한글 113%/111%), Codex CLI 화면(`assets/codex-cli-preview.png`)을 새 폰트로 다시 찍는다. → Claude Code 화면(`assets/claude-code-preview.png`)으로 바꿨다. `tools/render_preview.py`가 빌드한 Nerd Regular로 그린다(2026-10-11).
+    - 랜딩 페이지(https://monatendard.github.io/): `assets/fonts/`의 WOFF2 14종 교체, `v0.2.3` 릴리스 링크 5곳과 버전 표기(`script.js` 포함), 설계 설명과 지표(92.5%, 0.600em) 갱신.
+    - PR #1(Homebrew cask)은 태그 전에 머지한다.
+    - A로 확정되면 C는 직접 빌드 옵션으로 남긴다(2026-10-06). `[prototypes.proto-c]`를 `[profiles.compact]`(패밀리 `Monatendard Compact`, 버전은 본판을 따름)로 옮기고, A와 B 설정은 지운다. README "직접 빌드" 절에 `--profile compact` 사용법을 적고, "공식 배포하지 않음"을 밝힌다. compact 빌드와 `verify`를 테스트에 넣는다. 릴리스 파일, Homebrew cask, 랜딩 페이지는 A만 다룬다. → 2026-10-11 반영: lock·로더·테스트·CI·Makefile(`make compact`)·README 수치와 Compact 절. 남은 일: 랜딩 페이지, PR #1 머지, 태그.
 - 새 폰트의 기반 글꼴 선정과 이름
 
 **미해결 질문**

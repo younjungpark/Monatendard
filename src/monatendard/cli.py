@@ -39,7 +39,7 @@ def _add_variant_selection(parser: argparse.ArgumentParser) -> None:
     )
 
 
-PROTOTYPE_OUTPUT_ROOT = Path("build") / "proto"
+PROFILE_OUTPUT_ROOT = Path("build") / "profiles"
 
 
 def _add_profile(parser: argparse.ArgumentParser) -> None:
@@ -47,15 +47,15 @@ def _add_profile(parser: argparse.ArgumentParser) -> None:
         "--profile",
         default=DEFAULT_PROFILE,
         choices=profile_names(),
-        help="sources.lock.toml의 빌드 설정 (기본: default)",
+        help="sources.lock.toml의 빌드 설정 (기본: default, 선택: [profiles.*])",
     )
 
 
 def _profile_root(profile: BuildProfile) -> Path:
-    """시제품은 정식 fonts/와 섞이지 않도록 build/proto/<이름> 아래에 둔다."""
+    """선택 설정은 정식 fonts/와 섞이지 않도록 build/profiles/<이름> 아래에 둔다."""
     if profile.name == DEFAULT_PROFILE:
         return DEFAULT_OUTPUT_DIR
-    return PROTOTYPE_OUTPUT_ROOT / profile.name
+    return PROFILE_OUTPUT_ROOT / profile.name
 
 
 def _parser() -> argparse.ArgumentParser:

@@ -21,3 +21,7 @@ jobs:
       - run: uv run monatendard verify --reproducible
       - run: uv run monatendard build-nerd --variants Regular
       - run: uv run monatendard verify --nerd --reproducible
+      - run: uv run monatendard build --profile compact --variants Regular
+      - run: uv run monatendard verify --profile compact
+      - run: uv run monatendard build-nerd --profile compact --variants Regular
+      - run: uv run monatendard verify --profile compact --nerd

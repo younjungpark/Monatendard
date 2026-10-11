@@ -1,10 +1,10 @@
 [project]
-version = "0.2.3"
+version = "0.3.0"
 family = "Monatendard"
-latin_horizontal_scale = 0.925
-latin_advance_em = 0.600
-cjk_horizontal_scale = 1.13
-cjk_vertical_scale = 1.11
+latin_horizontal_scale = 1.0
+latin_advance_em = 0.620
+cjk_horizontal_scale = 1.15
+cjk_vertical_scale = 1.15
 
 [sources.monaspace]
 name = "Monaspace Neon Frozen"
@@ -29,27 +29,10 @@ url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/NerdFont
 sha256 = "8e617904b980fe3648a4b116808788fe50c99d2d495376cb7c0badbd8a564c47"
 license = "MIT"
 
-# 판정용 로컬 시제품. 영문은 Monaspace 원본 그대로, 한글은 균등 배율이다.
-[prototypes.proto-a]
-version = "0.3.0-proto"
-family = "Monatendard Proto A"
-latin_horizontal_scale = 1.0
-latin_advance_em = 0.620
-cjk_horizontal_scale = 1.15
-cjk_vertical_scale = 1.15
-
-[prototypes.proto-b]
-version = "0.3.0-proto"
-family = "Monatendard Proto B"
-latin_horizontal_scale = 1.0
-latin_advance_em = 0.620
-cjk_horizontal_scale = 1.07
-cjk_vertical_scale = 1.07
-
-# Proto A와 비교용. 영문과 셀 폭은 v0.2.3 그대로 두고 한글만 균등 배율로 바꾼다.
-[prototypes.proto-c]
-version = "0.3.0-proto"
-family = "Monatendard Proto C"
+# 직접 빌드용 선택 설정. 공식 배포하지 않는다. 버전은 [project]를 따른다.
+# compact: 영문을 가로 92.5%로 눌러 셀 폭을 0.600em으로 줄이고, 한글은 본판과 같은 균등 1.15배다.
+[profiles.compact]
+family = "Monatendard Compact"
 latin_horizontal_scale = 0.925
 latin_advance_em = 0.600
 cjk_horizontal_scale = 1.15

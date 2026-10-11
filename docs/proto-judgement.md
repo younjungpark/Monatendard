@@ -63,6 +63,11 @@ Proto C는 2026-10-05 Proto A 사용 후 추가했다. A의 개선이 한글 균
 - [ ] 한 줄 글자 수가 약 3% 줄어든 것이 불편한가
 - [ ] 그래도 Jetendard 프로필로 손이 가는가
 
+### 실사용 기록
+
+- **2026-10-06, 회사, Proto A 위주**: 한글 글자 사이가 Jetendard나 Proto C보다 넓게 느껴지지만 불편할 정도는 아니다(실측 30% 대 27%). 영문은 Monaspace Neon 원본이라 C보다 낫다. A 쪽으로 기운다. 회사 터미널은 Proto A Regular(보통)로 설정했다.
+- **2026-10-11, 판정**: 며칠 번갈아 써 본 결과 Proto A가 가장 적당했다. **Proto A를 v0.3.0 본판으로 확정**한다. Proto C는 `--profile compact`(패밀리 `Monatendard Compact`) 직접 빌드 옵션으로 남기고, Proto B는 지운다.
+
 ## 3. 결정
 
 | 결과 | 다음 단계 |
@@ -71,24 +76,9 @@ Proto C는 2026-10-05 Proto A 사용 후 추가했다. A의 개선이 한글 균
 | 탈락 | Monatendard는 v0.2.3 그대로 두고, 대체 기반 글꼴 측정을 시작한다 |
 | 한글만 흐림 | 한글 자동 힌팅을 별도로 실험한 뒤 다시 판정한다 |
 
-## 다시 빌드·제거
+## 시제품 정리
 
-```sh
-make proto    # 세 시제품 빌드, 검증, 비교 이미지 생성
-```
-
-```powershell
-# 다시 설치
-.\packaging\windows\proto\Install-MonatendardProto.ps1 `
-    -FontDirectory build\proto\proto-a\nerd-ttf `
-    -FilePrefix MonatendardProtoANFM `
-    -FamilyName 'Monatendard Proto A Nerd Font Mono'
-
-# 판정 후 제거
-.\packaging\windows\proto\Uninstall-MonatendardProto.ps1 -FilePrefix MonatendardProtoANFM
-.\packaging\windows\proto\Uninstall-MonatendardProto.ps1 -FilePrefix MonatendardProtoBNFM
-.\packaging\windows\proto\Uninstall-MonatendardProto.ps1 -FilePrefix MonatendardProtoCNFM
-```
+판정 후 시제품 설정(`[prototypes.*]`)과 판정용 도구(`make proto`, `tools/render_comparison.py`, `tools/package_proto.py`, `packaging/windows/proto/`)는 지웠다. 필요하면 커밋 `a91845e`에서 꺼내 쓴다. 이미 설치한 시험판은 `%LOCALAPPDATA%\Microsoft\Windows\Fonts`의 `MonatendardProto*NFM-*.ttf`와 HKCU 글꼴 레지스트리 항목을 지우면 된다.
 
 ## 코드 변경 요약
 

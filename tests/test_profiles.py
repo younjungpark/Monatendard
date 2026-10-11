@@ -19,49 +19,35 @@ ADVANCE = 1240
 SAMPLE = " A0Hinmwao"
 
 
-def test_default_profile_matches_released_family() -> None:
+def test_default_profile_keeps_latin_and_scales_hangul_uniformly() -> None:
     profile = load_profile()
     assert profile.family == "Monatendard"
     assert profile.file_prefix == "Monatendard"
     assert profile.nerd_family == "Monatendard Nerd Font Mono"
     assert profile.nerd_file_prefix == "MonatendardNFM"
-    assert not profile.keeps_latin_outlines
-
-
-@pytest.mark.parametrize(
-    ("name", "family", "file_prefix", "cjk_scale"),
-    [
-        ("proto-a", "Monatendard Proto A", "MonatendardProtoA", 1.15),
-        ("proto-b", "Monatendard Proto B", "MonatendardProtoB", 1.07),
-    ],
-)
-def test_prototype_profiles_keep_latin_and_scale_hangul_uniformly(
-    name: str, family: str, file_prefix: str, cjk_scale: float
-) -> None:
-    profile = load_profile(name)
-    assert profile.family == family
-    assert profile.file_prefix == file_prefix
-    assert profile.nerd_family == f"{family} Nerd Font Mono"
-    assert profile.nerd_file_prefix == f"{file_prefix}NFM"
     assert profile.keeps_latin_outlines
     assert profile.latin_advance_em == 0.620
-    assert profile.cjk_horizontal_scale == profile.cjk_vertical_scale == cjk_scale
-    assert name in profile_names()
-
-
-def test_proto_c_keeps_released_latin_and_scales_hangul_uniformly() -> None:
-    profile = load_profile("proto-c")
-    released = load_profile()
-    assert profile.family == "Monatendard Proto C"
-    assert not profile.keeps_latin_outlines
-    assert profile.latin_horizontal_scale == released.latin_horizontal_scale
-    assert profile.latin_advance_em == released.latin_advance_em
     assert profile.cjk_horizontal_scale == profile.cjk_vertical_scale == 1.15
+
+
+def test_compact_profile_compresses_latin_and_follows_project_version() -> None:
+    profile = load_profile("compact")
+    released = load_profile()
+    assert profile.family == "Monatendard Compact"
+    assert profile.file_prefix == "MonatendardCompact"
+    assert profile.nerd_family == "Monatendard Compact Nerd Font Mono"
+    assert profile.nerd_file_prefix == "MonatendardCompactNFM"
+    assert profile.version == released.version
+    assert not profile.keeps_latin_outlines
+    assert profile.latin_horizontal_scale == 0.925
+    assert profile.latin_advance_em == 0.600
+    assert profile.cjk_horizontal_scale == profile.cjk_vertical_scale == 1.15
+    assert profile_names() == ["default", "compact"]
 
 
 def test_unknown_profile_is_rejected() -> None:
     with pytest.raises(ValueError, match="profile"):
-        load_profile("proto-z")
+        load_profile("proto-a")
 
 
 def test_uniform_cjk_transform_shrinks_tall_glyph_on_both_axes_together() -> None:

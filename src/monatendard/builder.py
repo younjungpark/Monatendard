@@ -121,18 +121,19 @@ class BuildProfile:
 
 
 def load_profile(name: str = DEFAULT_PROFILE, lock: dict | None = None) -> BuildProfile:
-    """lock 파일에서 이름으로 빌드 설정을 읽는다."""
+    """lock 파일에서 이름으로 빌드 설정을 읽는다. 선택 설정의 빈 값은 `[project]`를 따른다."""
     lock = lock or load_lock(LOCK_PATH)
+    project = lock["project"]
     if name == DEFAULT_PROFILE:
-        values = lock["project"]
+        values = project
     else:
-        prototypes = lock.get("prototypes", {})
-        if name not in prototypes:
+        profiles = lock.get("profiles", {})
+        if name not in profiles:
             raise ValueError(
                 f"지원하지 않는 profile: {name}. "
-                f"지원 목록: {', '.join([DEFAULT_PROFILE, *prototypes])}"
+                f"지원 목록: {', '.join([DEFAULT_PROFILE, *profiles])}"
             )
-        values = prototypes[name]
+        values = project | profiles[name]
     return BuildProfile(
         name=name,
         family=str(values["family"]),
@@ -146,7 +147,7 @@ def load_profile(name: str = DEFAULT_PROFILE, lock: dict | None = None) -> Build
 
 def profile_names(lock: dict | None = None) -> list[str]:
     lock = lock or load_lock(LOCK_PATH)
-    return [DEFAULT_PROFILE, *lock.get("prototypes", {})]
+    return [DEFAULT_PROFILE, *lock.get("profiles", {})]
 
 
 @dataclass(frozen=True)
