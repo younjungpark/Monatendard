@@ -20,20 +20,20 @@ space reserved before the next character begins.
 | Item | Monaspace Neon Frozen source | Monatendard |
 |---|---:|---:|
 | Coordinate system | `2000 units` | `2000 units` |
-| Latin cell width | `1240`, `0.620em` | `1200`, `0.600em` |
-| Standard Latin outline width | 100% | 92.5% |
+| Latin cell width | `1240`, `0.620em` | `1240`, `0.620em` (unchanged) |
+| Standard Latin outline width | 100% | 100% (original outlines and hinting) |
 | Latin vertical scale | 100% | 100% |
-| Hangul/CJK outline scale | Not included | Up to 113% horizontal, 111% vertical |
-| Hangul cell width | Not included | `2400`, exactly two Latin character widths |
+| Hangul/CJK outline scale | Not included | Up to 115%, uniform (original proportions) |
+| Hangul cell width | Not included | `2480`, exactly two Latin character widths |
 
 <p align="center">
-  <img src="assets/codex-cli-preview.png"
-       alt="Monatendard Nerd Font Mono rendering aligned Korean, Latin, ligatures, and Nerd Font glyphs in Codex CLI"
+  <img src="assets/claude-code-preview.png"
+       alt="Monatendard Nerd Font Mono rendering aligned Korean, Latin, ligatures, and Nerd Font glyphs in Claude Code"
        width="900">
 </p>
 
 <p align="center">
-  <sub>Monatendard Nerd Font Mono in Codex CLI on Windows Terminal</sub>
+  <sub>Monatendard Nerd Font Mono in a Claude Code session, rendered with DirectWrite</sub>
 </p>
 
 ## Highlights
@@ -125,18 +125,36 @@ uv run monatendard verify --nerd --reproducible
 
 1. Pin the Monaspace Neon Frozen, Pretendard, and Nerd Fonts sources and verify
    their SHA256 checksums.
-2. Scale the Monaspace glyph outlines horizontally to 92.5% and center them in
-   0.600em Latin cells, while fitting box-drawing, block, and Powerline glyphs
-   to the cell edges so adjacent strokes remain continuous. Italic variants use
-   the matching upright outlines for these connecting glyphs.
-3. Scale Pretendard Hangul and CJK glyphs to 113% horizontally and 111%
-   vertically, then merge them into cells exactly twice the Latin width.
+2. Keep the Monaspace Latin outlines, hinting, and 0.620em cells unchanged.
+   Italic variants use the matching upright outlines for box-drawing, block,
+   and Powerline glyphs so adjacent strokes remain continuous.
+3. Scale Pretendard Hangul and CJK glyphs uniformly to 115%, keeping their
+   original proportions, then merge them into cells exactly twice the Latin
+   width.
 4. Set the Monatendard family, style, fixed-pitch, version, and license
    metadata.
 5. Generate desktop TTF files, web WOFF2 files, and `@font-face` CSS.
 6. Optionally merge Nerd Fonts Symbols Only icons into single-width cells.
 7. Verify glyph coverage, cell widths, ligatures, font metadata, and
    reproducible output before packaging.
+
+### Optional build: Monatendard Compact
+
+If you prefer the narrower Latin cells of v0.2.x, build the `compact` profile.
+It compresses Latin outlines to 92.5% in 0.600em cells (without hinting) and
+uses the same uniform 115% Hangul scale. The family is named
+`Monatendard Compact`, so it installs alongside the main font.
+
+```powershell
+uv run monatendard build --profile compact --all
+uv run monatendard build-nerd --profile compact --all
+uv run monatendard verify --profile compact
+uv run monatendard verify --profile compact --nerd
+```
+
+Output goes to `build/profiles/compact/`. Compact is **not officially
+released**: release assets, the Homebrew cask, and the website cover the main
+font only.
 
 See the [Korean README](README.ko.md) for the complete build, packaging, and
 release workflow.

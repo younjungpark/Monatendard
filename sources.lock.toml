@@ -1,10 +1,10 @@
 [project]
-version = "0.2.3"
+version = "0.3.0"
 family = "Monatendard"
-latin_horizontal_scale = 0.925
-latin_advance_em = 0.600
-cjk_horizontal_scale = 1.13
-cjk_vertical_scale = 1.11
+latin_horizontal_scale = 1.0
+latin_advance_em = 0.620
+cjk_horizontal_scale = 1.15
+cjk_vertical_scale = 1.15
 
 [sources.monaspace]
 name = "Monaspace Neon Frozen"
@@ -28,3 +28,12 @@ archive = "NerdFontsSymbolsOnly-v3.4.0.zip"
 url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/NerdFontsSymbolsOnly.zip"
 sha256 = "8e617904b980fe3648a4b116808788fe50c99d2d495376cb7c0badbd8a564c47"
 license = "MIT"
+
+# 직접 빌드용 선택 설정. 공식 배포하지 않는다. 버전은 [project]를 따른다.
+# compact: 영문을 가로 92.5%로 눌러 셀 폭을 0.600em으로 줄이고, 한글은 본판과 같은 균등 1.15배다.
+[profiles.compact]
+family = "Monatendard Compact"
+latin_horizontal_scale = 0.925
+latin_advance_em = 0.600
+cjk_horizontal_scale = 1.15
+cjk_vertical_scale = 1.15

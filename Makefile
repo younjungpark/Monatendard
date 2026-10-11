@@ -1,4 +1,4 @@
-.PHONY: sync download build smoke test lint verify package
+.PHONY: sync download build smoke test lint verify package compact
 
 sync:
 	uv sync --all-groups
@@ -25,4 +25,11 @@ verify:
 	uv run monatendard verify --nerd
 
 package:
-	uv run monatendard package --version 0.2.3
+	uv run monatendard package --version 0.3.0
+
+# 공식 배포하지 않는 선택 빌드. 출력은 build/profiles/compact/이다.
+compact:
+	uv run monatendard build --profile compact --all
+	uv run monatendard build-nerd --profile compact --all
+	uv run monatendard verify --profile compact
+	uv run monatendard verify --profile compact --nerd
