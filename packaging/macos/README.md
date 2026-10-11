@@ -24,6 +24,9 @@ Cask 갱신에 실패하더라도 이미 게시된 폰트 ZIP은 그대로 사�
   [verify_casks.sh](verify_casks.sh)의 검사 목록을 함께 수정합니다.
 - **설치·제거 오류:** Homebrew 로그에서 실패한 파일이나 명령을 확인합니다.
 - **PR 생성 오류:** Actions 로그에 표시된 저장소 권한이나 브랜치 관련 오류를 확인합니다.
+  저장소 **Settings → Actions → General → Workflow permissions**에서
+  **Allow GitHub Actions to create and approve pull requests**가 켜져 있어야 PR을 만들 수 있습니다
+  (2026-10-11에 켬).
 
 원인을 수정한 뒤 **Actions → Update font casks → Run workflow**에서 다시 실행합니다.
 브랜치는 `main`, `tag`에는 다시 배포할 정식 버전 태그를 지정합니다.
