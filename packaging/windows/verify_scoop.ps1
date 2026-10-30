@@ -212,6 +212,18 @@ try {
         $manualFile = $null
         # Scoop can retain a failed extraction. Remove it via the real CLI.
         if (Test-Path (Join-Path $scoopRoot ('apps\' + $p.Name))) { Invoke-Scoop @('uninstall', $p.Name) }
+
+        Write-Host "TEST: externally registered canonical family name is not overwritten: $($p.Name)"
+        $externalName = $p.Family + ' Regular (TrueType)'
+        $external = Join-Path $tempRoot ('external\' + $p.Prefix + 'Regular.ttf')
+        New-ItemProperty -Path $registry -Name $externalName -Value $external -PropertyType String | Out-Null
+        try {
+            $before = Get-FontRegistry
+            Invoke-Scoop @('install', ('monatendard/' + $p.Name)) -ExpectFailure
+            Assert-RegistryEqual $before (Get-FontRegistry)
+            Assert-True (@(Get-ChildItem -LiteralPath $fontDir -Filter ($p.Prefix + '*.ttf')).Count -eq 0) 'external registration prevents all installation'
+        } finally { Remove-ItemProperty -LiteralPath $registry -Name $externalName }
+        if (Test-Path (Join-Path $scoopRoot ('apps\' + $p.Name))) { Invoke-Scoop @('uninstall', $p.Name) }
     }
     Assert-UnrelatedRegistry
 
@@ -227,7 +239,7 @@ try {
         $prior.version = '0.2.3'
         $prior.url = 'https://github.com/younjungpark/Monatendard/releases/download/v0.2.3/' + $p.Asset
         $prior.hash = $hash
-        # Keep the real old ZIP scripts: subprocess hooks isolate their Add-Type.
+        # Keep the real old ZIP installer; the manifest owns safe removal.
         Set-LocalManifest $p $prior
         Invoke-Scoop @('install', ('monatendard/' + $p.Name))
         $oldFonts = Join-Path $tempRoot ($p.Name + '-old-fonts')

@@ -27,6 +27,20 @@ jobs:
         shell: powershell
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify manifests against published checksums on Windows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $manifest = Get-Content bucket/monatendard.json -Raw | ConvertFrom-Json
+          if ($manifest.url -notmatch '^https://github.com/([^/]+/[^/]+)/releases/') { throw 'Invalid release URL' }
+          $repository = $Matches[1]
+          python packaging/windows/update_scoop.py --repository $repository --tag ('v' + $manifest.version)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code -- bucket
+          if ($LASTEXITCODE -ne 0) { throw 'Committed manifests do not match the published release' }
       - name: Install Scoop for the runner user
         run: |
           Invoke-WebRequest https://get.scoop.sh -OutFile "$env:RUNNER_TEMP\install-scoop.ps1"

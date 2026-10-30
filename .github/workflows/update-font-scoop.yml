@@ -54,7 +54,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_REPOSITORY: ${{ inputs.source_repository || github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: python packaging/windows/update_scoop.py --repository "$env:SOURCE_REPOSITORY" --tag "$env:RELEASE_TAG"
+        run: |
+          $arguments = @('packaging/windows/update_scoop.py', '--repository', $env:SOURCE_REPOSITORY)
+          if (-not [string]::IsNullOrWhiteSpace($env:RELEASE_TAG)) {
+            $arguments += @('--tag', $env:RELEASE_TAG)
+          }
+          & python @arguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install Scoop for the runner user
         run: |
           Invoke-WebRequest https://get.scoop.sh -OutFile "$env:RUNNER_TEMP\install-scoop.ps1"
