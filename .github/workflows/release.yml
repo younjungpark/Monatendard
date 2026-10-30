@@ -59,3 +59,10 @@ jobs:
     uses: ./.github/workflows/update-font-casks.yml
     with:
       tag: v${{ needs.build-release.outputs.version }}
+
+  update-font-scoop:
+    needs: build-release
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    uses: ./.github/workflows/update-font-scoop.yml
+    with:
+      tag: v${{ needs.build-release.outputs.version }}

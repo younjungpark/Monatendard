@@ -1,0 +1,59 @@
+name: Windows Scoop
+
+on:
+  pull_request:
+    paths:
+      - 'bucket/**'
+      - 'packaging/windows/**'
+      - '.github/workflows/scoop.yml'
+      - '.github/workflows/update-font-scoop.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'bucket/**'
+      - 'packaging/windows/**'
+      - '.github/workflows/scoop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-scoop:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify manifests against published checksums on Windows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $manifest = Get-Content bucket/monatendard.json -Raw | ConvertFrom-Json
+          if ($manifest.url -notmatch '^https://github.com/([^/]+/[^/]+)/releases/') { throw 'Invalid release URL' }
+          $repository = $Matches[1]
+          python packaging/windows/update_scoop.py --repository $repository --tag ('v' + $manifest.version)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code -- bucket
+          if ($LASTEXITCODE -ne 0) { throw 'Committed manifests do not match the published release' }
+      - name: Install Scoop for the runner user
+        run: |
+          Invoke-WebRequest https://get.scoop.sh -OutFile "$env:RUNNER_TEMP\install-scoop.ps1"
+          & "$env:RUNNER_TEMP\install-scoop.ps1" -RunAsAdmin
+          if (-not (Test-Path "$env:USERPROFILE\scoop\shims\scoop.ps1")) { throw 'Scoop bootstrap failed' }
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Verify official packages, upgrades, locks and source scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '& .\packaging\windows\verify_scoop.ps1 -TestSourceScripts'
+      # Each step starts a fresh PowerShell process. The verifier removes its
+      # bucket, apps, fonts and registry sentinels in finally before the next run.
+      - name: Verify source scripts through Scoop installation and upgrades
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '& .\packaging\windows\verify_scoop.ps1 -SourceScripts'
