@@ -1,0 +1,83 @@
+name: Update font Scoop manifests
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Stable release tag (empty for latest)'
+        type: string
+      source_repository:
+        description: 'Release source owner/name (empty for this repository)'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-font-scoop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-and-verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Select target branch
+        id: target
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          $base = if ($env:EVENT -eq 'workflow_dispatch' -and $env:REF_TYPE -eq 'branch') { $env:REF_NAME } else { $env:DEFAULT_BRANCH }
+          "base=$base" >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.base }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify official checksums and update both manifests
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPOSITORY: ${{ inputs.source_repository || github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python packaging/windows/update_scoop.py --repository "$env:SOURCE_REPOSITORY" --tag "$env:RELEASE_TAG"
+      - name: Install Scoop for the runner user
+        run: |
+          Invoke-WebRequest https://get.scoop.sh -OutFile "$env:RUNNER_TEMP\install-scoop.ps1"
+          & "$env:RUNNER_TEMP\install-scoop.ps1" -RunAsAdmin
+          if (-not (Test-Path "$env:USERPROFILE\scoop\shims\scoop.ps1")) { throw 'Scoop bootstrap failed' }
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Verify installation, upgrade and removal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '& .\packaging\windows\verify_scoop.ps1 -TestSourceScripts'
+      - name: Create or update verified PR
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ github.token }}
+          base: ${{ steps.target.outputs.base }}
+          branch: automation/scoop-${{ steps.update.outputs.version }}
+          add-paths: bucket/*.json
+          commit-message: 'chore: update Scoop fonts to ${{ steps.update.outputs.version }}'
+          title: 'Scoop 폰트 ${{ steps.update.outputs.version }} 갱신'
+          body: |
+            공식 정식 릴리스의 Desktop·Nerd ZIP과 SHA256SUMS를 대조해 매니페스트를 갱신합니다.
+            Windows에서 사용자 단위 설치·업데이트·제거 검증을 실행한 뒤 생성한 PR입니다.
+            실제 앱 렌더링과 모든 Windows 버전에서의 동작은 자동 검증에 포함되지 않습니다.
+
+            검증 실행: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

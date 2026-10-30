@@ -6,11 +6,35 @@ $userFontDirectory = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 $fontRegistry = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
 $removed = 0
 
+$fontFiles = @()
+if (Test-Path -LiteralPath $userFontDirectory) {
+    $fontFiles = @(Get-ChildItem -LiteralPath $userFontDirectory -Filter 'Monatendard-*.ttf' -File)
+}
 if (-not $WhatIfPreference) {
+    # Check all files before unloading, deleting, or removing registration.
+    foreach ($font in $fontFiles) {
+        $stream = $null
+        try {
+            $stream = [System.IO.File]::Open(
+                $font.FullName, [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None
+            )
+        } catch {
+            throw "Cannot remove font: $($font.FullName). Close applications using the fonts and retry. $($_.Exception.Message)"
+        } finally {
+            if ($null -ne $stream) { $stream.Dispose() }
+        }
+    }
+}
+
+if (-not $WhatIfPreference -and -not ('MonatendardFontApi' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 public static class MonatendardFontApi {
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern int AddFontResourceEx(string fileName, uint flags, IntPtr reserved);
+
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool RemoveFontResourceEx(string fileName, uint flags, IntPtr reserved);
 
@@ -22,6 +46,21 @@ public static class MonatendardFontApi {
 '@
 }
 
+foreach ($font in $fontFiles) {
+    if ($PSCmdlet.ShouldProcess($font.FullName, 'Remove current-user font file')) {
+        while ([MonatendardFontApi]::RemoveFontResourceEx(
+            $font.FullName, 0, [IntPtr]::Zero
+        )) {}
+        try {
+            Remove-Item -LiteralPath $font.FullName -Force
+        } catch {
+            throw "Cannot remove font: $($font.FullName). Close applications using the fonts and retry. $($_.Exception.Message)"
+        }
+        $removed++
+    }
+}
+
+# Only remove matching registrations after every file deletion has succeeded.
 if (Test-Path -LiteralPath $fontRegistry) {
     $properties = (Get-ItemProperty -LiteralPath $fontRegistry).PSObject.Properties
     foreach ($property in $properties) {
@@ -29,21 +68,13 @@ if (Test-Path -LiteralPath $fontRegistry) {
         if ($property.Name -like 'PS*' -or $fileName -notlike 'Monatendard-*.ttf') {
             continue
         }
-        if ($PSCmdlet.ShouldProcess($property.Name, 'Remove current-user font registry entry')) {
-            Remove-ItemProperty -LiteralPath $fontRegistry -Name $property.Name
+        $destination = Join-Path $userFontDirectory $fileName
+        if ([string]$property.Value -ne $fileName -and [string]$property.Value -ne $destination) {
+            continue
         }
-    }
-}
-
-if (Test-Path -LiteralPath $userFontDirectory) {
-    $fontFiles = @(Get-ChildItem -LiteralPath $userFontDirectory -Filter 'Monatendard-*.ttf' -File)
-    foreach ($font in $fontFiles) {
-        if ($PSCmdlet.ShouldProcess($font.FullName, 'Remove current-user font file')) {
-            [void][MonatendardFontApi]::RemoveFontResourceEx(
-                $font.FullName, 0, [IntPtr]::Zero
-            )
-            Remove-Item -LiteralPath $font.FullName -Force
-            $removed++
+        if (($WhatIfPreference -or -not (Test-Path -LiteralPath $destination)) -and
+            $PSCmdlet.ShouldProcess($property.Name, 'Remove current-user font registry entry')) {
+            Remove-ItemProperty -LiteralPath $fontRegistry -Name $property.Name
         }
     }
 }

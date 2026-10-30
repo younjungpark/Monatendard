@@ -1,0 +1,40 @@
+{
+    "version": "0.3.0",
+    "description": "Monatendard Nerd Font Mono with terminal icons (14 styles)",
+    "homepage": "https://monatendard.github.io/",
+    "license": {"identifier": "OFL-1.1", "url": "https://github.com/younjungpark/Monatendard/blob/main/LICENSE"},
+    "url": "https://github.com/younjungpark/Monatendard/releases/download/v0.3.0/Monatendard-v0.3.0-Desktop-Nerd.zip",
+    "hash": "2a1f81077f6b8306801587c842eac64666bd01b7705c36490de3603b831aa0cb",
+    "pre_install": [
+        "if ($global) { throw 'Only per-user installation is supported. Do not use -g.' }",
+        "if ([Environment]::OSVersion.Version.Build -lt 17763) { throw 'Windows 10 1809 or later is required.' }",
+        "$fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Fonts'",
+        "foreach ($font in (Get-ChildItem \"$dir\\fonts\\MonatendardNFM-*.ttf\")) {",
+        "    if (Test-Path -LiteralPath (Join-Path $fontDir $font.Name)) { throw 'Existing manual font installation detected. Close applications, uninstall the ZIP-installed family, then retry Scoop. No files were overwritten.' }",
+        "}"
+    ],
+    "installer": {
+        "script": [
+            "& \"$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$dir\\Install-Monatendard-Nerd.ps1\"",
+            "if ($LASTEXITCODE -ne 0) { throw 'Font installation failed. Close applications using the font and retry; inspect the error above.' }"
+        ]
+    },
+    "pre_uninstall": [
+        "$fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Fonts'",
+        "$handles = @()",
+        "try {",
+        "    foreach ($font in (Get-ChildItem \"$dir\\fonts\\MonatendardNFM-*.ttf\")) {",
+        "        $target = Join-Path $fontDir $font.Name",
+        "        if (Test-Path -LiteralPath $target) { $handles += [IO.File]::Open($target, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }",
+        "    }",
+        "} catch { throw 'Cannot remove fonts in use. Close editors and terminals using Monatendard Nerd Font Mono, then retry. Registration has not been removed.' }",
+        "finally { foreach ($handle in $handles) { $handle.Dispose() } }"
+    ],
+    "uninstaller": {
+        "script": [
+            "& \"$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$dir\\Uninstall-Monatendard-Nerd.ps1\"",
+            "if ($LASTEXITCODE -ne 0) { throw 'Font removal failed. Close applications using the font and retry; inspect the error above.' }"
+        ]
+    },
+    "notes": "Includes OFL-1.1 fonts and MIT-licensed Nerd Font symbols; see LICENSES in the package. Restart editors and terminals and select Monatendard Nerd Font Mono. Close applications using this family before updating or uninstalling."
+}

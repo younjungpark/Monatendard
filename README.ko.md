@@ -38,6 +38,37 @@ Oh My Posh 같은 터미널 아이콘이 필요하면 일반판 대신
 
 스크립트는 관리자 권한 없이 현재 사용자 영역에 설치합니다.
 
+### Windows (Scoop)
+
+Windows 10 1809 이상, [Scoop](https://scoop.sh/), Git이 필요합니다.
+관리자가 아닌 일반 사용자 PowerShell에서 bucket을 최초 한 번 등록하세요.
+
+```powershell
+scoop bucket add monatendard https://github.com/younjungpark/Monatendard.git
+```
+
+이후 필요한 패밀리를 한 줄로 설치할 수 있습니다. 두 패밀리를 함께 설치해도 됩니다.
+
+```powershell
+scoop install monatendard/monatendard
+scoop install monatendard/monatendard-nerd
+```
+
+업데이트·제거 전에는 해당 글꼴을 사용하는 편집기와 터미널을 닫으세요.
+글꼴을 사용하지 않는 PowerShell 창에서 다음 명령을 실행합니다.
+하나만 설치했다면 해당 패키지 이름만 지정하세요.
+
+```powershell
+scoop update
+scoop update monatendard monatendard-nerd
+scoop uninstall monatendard monatendard-nerd
+```
+
+설치 후에는 앱을 다시 시작하고 `Monatendard` 또는 `Monatendard Nerd Font Mono`를 선택하세요.
+전체 사용자 설치(`-g`)는 지원하지 않습니다. ZIP으로 수동 설치한 패밀리가 있다면
+기존 ZIP의 제거 스크립트로 먼저 제거한 뒤 Scoop으로 설치하세요. 기존 파일을 덮어쓰지 않습니다.
+검증·복구·배포 절차는 [Windows 배포 문서](packaging/windows/README.md)를 참고하세요.
+
 ### macOS (Homebrew)
 
 Homebrew에서 필요한 글꼴을 설치하세요. 일반판과 Nerd판을 함께 설치해도 됩니다.

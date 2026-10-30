@@ -62,6 +62,36 @@ For Windows:
 The installer works per user and does not require administrator privileges.
 Matching uninstall scripts are included in each package.
 
+### Windows (Scoop)
+
+Requires Windows 10 1809 or later, [Scoop](https://scoop.sh/), and Git.
+Run PowerShell as your normal user, not as administrator. Register this bucket once:
+
+```powershell
+scoop bucket add monatendard https://github.com/younjungpark/Monatendard.git
+```
+
+Then install either or both families:
+
+```powershell
+scoop install monatendard/monatendard
+scoop install monatendard/monatendard-nerd
+```
+
+After setup, each install, update, or removal is one command. Close applications
+using the fonts before updating or uninstalling; restart them after installation.
+
+```powershell
+scoop update
+scoop update monatendard monatendard-nerd
+scoop uninstall monatendard monatendard-nerd
+```
+
+Specify only the packages you installed. Global (`-g`) installation is not supported.
+If you already installed a family from a ZIP, remove it with its bundled uninstall
+script before switching to Scoop. Existing manual font files are not overwritten.
+See [Windows packaging notes](packaging/windows/README.md) for verification and recovery.
+
 ### macOS (Homebrew)
 
 Install either or both font families with Homebrew:
