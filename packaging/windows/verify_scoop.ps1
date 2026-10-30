@@ -140,6 +140,20 @@ try {
     foreach ($p in $packages) {
         $p.Current = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ('bucket\' + $p.Name + '.json')) | ConvertFrom-Json
         $p.Fonts = Join-Path $tempRoot ($p.Name + '-fonts')
+        # Exercise the global-install guard without creating a global app dir.
+        $rejected = $false
+        try {
+            & {
+                param($Manifest)
+                $global = $true
+                Invoke-Command ([scriptblock]::Create($Manifest.pre_install -join "`r`n"))
+            } $p.Current
+        } catch {
+            if ($_.Exception.Message -notlike '*Only per-user installation*') { throw }
+            $rejected = $true
+        }
+        Assert-True $rejected 'manifest rejects global installation before font changes'
+        Assert-RegistryEqual $baseline (Get-FontRegistry)
         Set-LocalManifest $p $p.Current -Overlay:$SourceScripts
     }
 
@@ -210,7 +224,11 @@ try {
     }
     foreach ($p in $packages) {
         Invoke-Scoop @('update', $p.Name)
-        $installed = Get-Content -Raw -LiteralPath (Join-Path (Get-AppDirectory $p) 'manifest.json') | ConvertFrom-Json
+        $installedPath = Join-Path (Get-AppDirectory $p) 'scoop-manifest.json'
+        if (-not (Test-Path -LiteralPath $installedPath)) {
+            $installedPath = Join-Path (Get-AppDirectory $p) 'manifest.json'
+        }
+        $installed = Get-Content -Raw -LiteralPath $installedPath | ConvertFrom-Json
         Assert-True ($installed.version -eq $p.Current.version) 'Scoop installed the current version after update'
         Assert-Family $p $true $p.Fonts
     }
