@@ -32,6 +32,8 @@ def test_manifest_lifecycle_contract(package, prefix, script):
     pre_uninstall = "\n".join(manifest["pre_uninstall"])
     assert f"fonts\\{prefix}*.ttf" in pre_uninstall
     assert "[IO.FileShare]::None" in pre_uninstall
+    assert pre_uninstall.index("::RemoveFontResourceEx(") < pre_uninstall.index("[IO.File]::Open(")
+    assert "$i -lt $released[$path]" in pre_uninstall
     assert "finally" in pre_uninstall
     assert "$handle.Dispose()" in pre_uninstall
     assert "Remove-ItemProperty" not in pre_uninstall

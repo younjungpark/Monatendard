@@ -100,7 +100,10 @@ def test_windows_font_lifecycle_is_safe(suffix: str, api: str) -> None:
         assert "$stream.Dispose()" in script
         assert "Rename-Item" not in script
         assert "Close applications using the fonts and retry." in script
-        assert script.index("[System.IO.File]::Open(") < script.index("]::RemoveFontResourceEx(")
+        assert script.index("]::RemoveFontResourceEx(") < script.index("[System.IO.File]::Open(")
+        assert "$released[$destination]++" in script
+        assert "$i -lt $released[$path]" in script
+
         assert "if (-not $WhatIfPreference)" in script
     installer, uninstaller = scripts
     assert installer.index("[System.IO.File]::Open(") < installer.index(

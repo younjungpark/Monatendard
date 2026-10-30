@@ -10,23 +10,6 @@ $fontFiles = @()
 if (Test-Path -LiteralPath $userFontDirectory) {
     $fontFiles = @(Get-ChildItem -LiteralPath $userFontDirectory -Filter 'Monatendard-*.ttf' -File)
 }
-if (-not $WhatIfPreference) {
-    # Check all files before unloading, deleting, or removing registration.
-    foreach ($font in $fontFiles) {
-        $stream = $null
-        try {
-            $stream = [System.IO.File]::Open(
-                $font.FullName, [System.IO.FileMode]::Open,
-                [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None
-            )
-        } catch {
-            throw "Cannot remove font: $($font.FullName). Close applications using the fonts and retry. $($_.Exception.Message)"
-        } finally {
-            if ($null -ne $stream) { $stream.Dispose() }
-        }
-    }
-}
-
 if (-not $WhatIfPreference -and -not ('MonatendardFontApi' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
@@ -44,6 +27,31 @@ public static class MonatendardFontApi {
         uint flags, uint timeout, out UIntPtr result);
 }
 '@
+}
+
+if (-not $WhatIfPreference) {
+    $released = @{}
+    try {
+        foreach ($font in $fontFiles) {
+            $destination = $font.FullName
+            $released[$destination] = 0
+            while ([MonatendardFontApi]::RemoveFontResourceEx($destination, 0, [IntPtr]::Zero)) {
+                $released[$destination]++
+            }
+            $stream = [System.IO.File]::Open(
+                $destination, [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None
+            )
+            $stream.Dispose()
+        }
+    } catch {
+        foreach ($path in $released.Keys) {
+            for ($i = 0; $i -lt $released[$path]; $i++) {
+                [void][MonatendardFontApi]::AddFontResourceEx($path, 0, [IntPtr]::Zero)
+            }
+        }
+        throw "Cannot remove fonts. Close applications using the fonts and retry. $($_.Exception.Message)"
+    }
 }
 
 foreach ($font in $fontFiles) {

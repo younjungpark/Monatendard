@@ -15,30 +15,6 @@ if ($fontFiles.Count -eq 0) {
 
 $userFontDirectory = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 $fontRegistry = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
-if (-not $WhatIfPreference) {
-    # Check every existing destination before changing any font or registration.
-    foreach ($font in $fontFiles) {
-        $destination = Join-Path $userFontDirectory $font.Name
-        if (Test-Path -LiteralPath $destination) {
-            $stream = $null
-            try {
-                $stream = [System.IO.File]::Open(
-                    $destination, [System.IO.FileMode]::Open,
-                    [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None
-                )
-            } catch {
-                throw "Cannot update font: $destination. Close applications using the fonts and retry. $($_.Exception.Message)"
-            } finally {
-                if ($null -ne $stream) { $stream.Dispose() }
-            }
-        }
-    }
-    New-Item -ItemType Directory -Force -Path $userFontDirectory | Out-Null
-    if (-not (Test-Path -LiteralPath $fontRegistry)) {
-        New-Item -Path $fontRegistry | Out-Null
-    }
-}
-
 if (-not $WhatIfPreference -and -not ('MonatendardNerdFontApi' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
@@ -56,6 +32,37 @@ public static class MonatendardNerdFontApi {
         uint flags, uint timeout, out UIntPtr result);
 }
 '@
+}
+
+if (-not $WhatIfPreference) {
+    # GDI itself holds read locks; restore released references on preflight failure.
+    $released = @{}
+    try {
+        foreach ($font in $fontFiles) {
+            $destination = Join-Path $userFontDirectory $font.Name
+            if (-not (Test-Path -LiteralPath $destination)) { continue }
+            $released[$destination] = 0
+            while ([MonatendardNerdFontApi]::RemoveFontResourceEx($destination, 0, [IntPtr]::Zero)) {
+                $released[$destination]++
+            }
+            $stream = [System.IO.File]::Open(
+                $destination, [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None
+            )
+            $stream.Dispose()
+        }
+    } catch {
+        foreach ($path in $released.Keys) {
+            for ($i = 0; $i -lt $released[$path]; $i++) {
+                [void][MonatendardNerdFontApi]::AddFontResourceEx($path, 0, [IntPtr]::Zero)
+            }
+        }
+        throw "Cannot update fonts. Close applications using the fonts and retry. $($_.Exception.Message)"
+    }
+    New-Item -ItemType Directory -Force -Path $userFontDirectory | Out-Null
+    if (-not (Test-Path -LiteralPath $fontRegistry)) {
+        New-Item -Path $fontRegistry | Out-Null
+    }
 }
 
 foreach ($font in $fontFiles) {
