@@ -301,6 +301,8 @@ def test_online_cli_fetches_metadata_and_exact_assets(release_files, monkeypatch
     def metadata(command, **kwargs):
         endpoint = "tags/v0.2.3" if tag else "latest"
         assert command == ["gh", "api", f"repos/{REPOSITORY}/releases/{endpoint}"]
+        # gh emits UTF-8 even when Windows' default text encoding is cp1252.
+        assert kwargs.get("encoding") == "utf-8"
         return json.dumps(release_files[1])
     def download(command, **kwargs):
         calls.append(command)

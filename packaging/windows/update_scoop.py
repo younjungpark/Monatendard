@@ -154,7 +154,9 @@ def main(argv=None):
         endpoint = f"repos/{args.repository}/releases/" + (
             f"tags/{args.tag}" if args.tag else "latest"
         )
-        release = json.loads(subprocess.check_output(["gh", "api", endpoint], text=True))
+        release = json.loads(
+            subprocess.check_output(["gh", "api", endpoint], text=True, encoding="utf-8")
+        )
         version = release_version(release)
         if args.tag and release["tag_name"] != args.tag:
             raise ValueError("Release metadata does not match requested tag")
