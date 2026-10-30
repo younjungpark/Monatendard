@@ -12,11 +12,11 @@ if (Test-Path -LiteralPath $userFontDirectory) {
         Get-ChildItem -LiteralPath $userFontDirectory -Filter 'MonatendardNFM-*.ttf' -File
     )
 }
-if (-not $WhatIfPreference -and -not ('MonatendardNerdFontApi' -as [type])) {
+if (-not $WhatIfPreference -and -not ('MonatendardNerdFontApiV2' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class MonatendardNerdFontApi {
+public static class MonatendardNerdFontApiV2 {
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern int AddFontResourceEx(string fileName, uint flags, IntPtr reserved);
 
@@ -37,7 +37,7 @@ if (-not $WhatIfPreference) {
         foreach ($font in $fontFiles) {
             $destination = $font.FullName
             $released[$destination] = 0
-            while ([MonatendardNerdFontApi]::RemoveFontResourceEx($destination, 0, [IntPtr]::Zero)) {
+            while ([MonatendardNerdFontApiV2]::RemoveFontResourceEx($destination, 0, [IntPtr]::Zero)) {
                 $released[$destination]++
             }
             $stream = [System.IO.File]::Open(
@@ -49,7 +49,7 @@ if (-not $WhatIfPreference) {
     } catch {
         foreach ($path in $released.Keys) {
             for ($i = 0; $i -lt $released[$path]; $i++) {
-                [void][MonatendardNerdFontApi]::AddFontResourceEx($path, 0, [IntPtr]::Zero)
+                [void][MonatendardNerdFontApiV2]::AddFontResourceEx($path, 0, [IntPtr]::Zero)
             }
         }
         throw "Cannot remove fonts. Close applications using the fonts and retry. $($_.Exception.Message)"
@@ -58,7 +58,7 @@ if (-not $WhatIfPreference) {
 
 foreach ($font in $fontFiles) {
     if ($PSCmdlet.ShouldProcess($font.FullName, 'Remove current-user Nerd font file')) {
-        while ([MonatendardNerdFontApi]::RemoveFontResourceEx(
+        while ([MonatendardNerdFontApiV2]::RemoveFontResourceEx(
             $font.FullName, 0, [IntPtr]::Zero
         )) {}
         try {
@@ -91,7 +91,7 @@ if (Test-Path -LiteralPath $fontRegistry) {
 
 if (-not $WhatIfPreference) {
     $result = [UIntPtr]::Zero
-    [void][MonatendardNerdFontApi]::SendMessageTimeout(
+    [void][MonatendardNerdFontApiV2]::SendMessageTimeout(
         [IntPtr]0xffff, 0x001D, [UIntPtr]::Zero, [IntPtr]::Zero,
         0x0002, 5000, [ref]$result
     )

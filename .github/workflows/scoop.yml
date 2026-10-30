@@ -51,3 +51,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: '& .\packaging\windows\verify_scoop.ps1 -TestSourceScripts'
+      # Each step starts a fresh PowerShell process. The verifier removes its
+      # bucket, apps, fonts and registry sentinels in finally before the next run.
+      - name: Verify source scripts through Scoop installation and upgrades
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '& .\packaging\windows\verify_scoop.ps1 -SourceScripts'

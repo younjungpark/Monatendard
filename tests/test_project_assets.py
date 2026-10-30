@@ -75,7 +75,7 @@ def test_windows_installers_preserve_existing_font_registry_entries() -> None:
 
 
 @pytest.mark.parametrize(
-    "suffix,api", [("", "MonatendardFontApi"), ("-Nerd", "MonatendardNerdFontApi")]
+    "suffix,api", [("", "MonatendardFontApiV2"), ("-Nerd", "MonatendardNerdFontApiV2")]
 )
 def test_windows_font_lifecycle_is_safe(suffix: str, api: str) -> None:
     scripts = [

@@ -15,11 +15,11 @@ if ($fontFiles.Count -eq 0) {
 
 $userFontDirectory = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 $fontRegistry = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
-if (-not $WhatIfPreference -and -not ('MonatendardNerdFontApi' -as [type])) {
+if (-not $WhatIfPreference -and -not ('MonatendardNerdFontApiV2' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class MonatendardNerdFontApi {
+public static class MonatendardNerdFontApiV2 {
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern int AddFontResourceEx(string fileName, uint flags, IntPtr reserved);
 
@@ -42,7 +42,7 @@ if (-not $WhatIfPreference) {
             $destination = Join-Path $userFontDirectory $font.Name
             if (-not (Test-Path -LiteralPath $destination)) { continue }
             $released[$destination] = 0
-            while ([MonatendardNerdFontApi]::RemoveFontResourceEx($destination, 0, [IntPtr]::Zero)) {
+            while ([MonatendardNerdFontApiV2]::RemoveFontResourceEx($destination, 0, [IntPtr]::Zero)) {
                 $released[$destination]++
             }
             $stream = [System.IO.File]::Open(
@@ -54,7 +54,7 @@ if (-not $WhatIfPreference) {
     } catch {
         foreach ($path in $released.Keys) {
             for ($i = 0; $i -lt $released[$path]; $i++) {
-                [void][MonatendardNerdFontApi]::AddFontResourceEx($path, 0, [IntPtr]::Zero)
+                [void][MonatendardNerdFontApiV2]::AddFontResourceEx($path, 0, [IntPtr]::Zero)
             }
         }
         throw "Cannot update fonts. Close applications using the fonts and retry. $($_.Exception.Message)"
@@ -74,7 +74,7 @@ foreach ($font in $fontFiles) {
     if ($PSCmdlet.ShouldProcess($destination, 'Install Nerd font for the current user')) {
         while (
             (Test-Path -LiteralPath $destination) -and
-            [MonatendardNerdFontApi]::RemoveFontResourceEx(
+            [MonatendardNerdFontApiV2]::RemoveFontResourceEx(
                 $destination, 0, [IntPtr]::Zero
             )
         ) {}
@@ -89,7 +89,7 @@ foreach ($font in $fontFiles) {
             -Value $destination `
             -PropertyType String `
             -Force | Out-Null
-        $loaded = [MonatendardNerdFontApi]::AddFontResourceEx(
+        $loaded = [MonatendardNerdFontApiV2]::AddFontResourceEx(
             $destination, 0, [IntPtr]::Zero
         )
         if ($loaded -eq 0) {
@@ -100,7 +100,7 @@ foreach ($font in $fontFiles) {
 
 if (-not $WhatIfPreference) {
     $result = [UIntPtr]::Zero
-    [void][MonatendardNerdFontApi]::SendMessageTimeout(
+    [void][MonatendardNerdFontApiV2]::SendMessageTimeout(
         [IntPtr]0xffff, 0x001D, [UIntPtr]::Zero, [IntPtr]::Zero,
         0x0002, 5000, [ref]$result
     )

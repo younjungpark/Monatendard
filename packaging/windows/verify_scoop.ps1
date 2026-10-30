@@ -261,6 +261,74 @@ try {
     Assert-UnrelatedRegistry
 
     if ($TestSourceScripts) {
+        Write-Host 'TEST: source lifecycle with each real v0.3.0 API shape already loaded'
+        $legacyRoot = Join-Path $tempRoot 'v0.3.0'
+        New-Item -ItemType Directory -Path $legacyRoot | Out-Null
+        Invoke-Native gh @('release', 'download', 'v0.3.0', '--repo', 'younjungpark/Monatendard', '--pattern', '*Desktop*.zip', '--pattern', 'SHA256SUMS.txt', '--dir', $legacyRoot)
+        $legacyChecksums = Get-Content -LiteralPath (Join-Path $legacyRoot 'SHA256SUMS.txt')
+        # Types cannot be unloaded in Windows PowerShell 5.1. Each legacy shape
+        # gets a fresh child, but its type and the new lifecycle share ONE process.
+        # Load only the published type, not the unsafe legacy registry cleanup.
+        $harnessPath = Join-Path $tempRoot 'legacy-api-test.ps1'
+        @(
+            'param($LegacyScript, $SourceRoot, $PackagePath)'
+            '$ErrorActionPreference = "Stop"; Set-StrictMode -Version Latest'
+            '$fontDir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"'
+            '$registry = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"'
+            "function Assert-True { ${function:Assert-True} }"
+            "function Get-FontRegistry { ${function:Get-FontRegistry} }"
+            "function Assert-Family { ${function:Assert-Family} }"
+            @'
+$p = Get-Content -Raw -LiteralPath $PackagePath | ConvertFrom-Json
+$source = Get-Content -Raw -LiteralPath $LegacyScript
+$definition = [regex]::Match($source, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@")
+Assert-True $definition.Success 'published script contains an Add-Type definition'
+Add-Type -TypeDefinition $definition.Groups[1].Value
+$apiName = if ($p.Suffix) { 'MonatendardNerdFontApi' } else { 'MonatendardFontApi' }
+$legacyType = $apiName -as [type]
+Assert-True ($null -ne $legacyType) 'legacy unversioned type is loaded'
+$isInstall = (Split-Path $LegacyScript -Leaf) -like 'Install-*'
+Assert-True (($null -ne $legacyType.GetMethod('AddFontResourceEx')) -eq $isInstall) 'legacy AddFontResourceEx shape'
+Assert-True (($null -ne $legacyType.GetMethod('RemoveFontResourceEx')) -eq (-not $isInstall -or [bool]$p.Suffix)) 'legacy RemoveFontResourceEx shape'
+Assert-True ($null -eq (($apiName + 'V2') -as [type])) 'new type is not preloaded'
+if ($isInstall) {
+    # Fonts were seeded by the parent. Exercise new Uninstall FIRST, before
+    # new Install has had any chance to define the replacement API type.
+    Assert-Family $p $true $p.Fonts
+    & (Join-Path $SourceRoot ('Uninstall-Monatendard' + $p.Suffix + '.ps1'))
+    Assert-Family $p $false $p.Fonts
+}
+& (Join-Path $SourceRoot ('Install-Monatendard' + $p.Suffix + '.ps1')) -FontDirectory $p.Fonts
+Assert-Family $p $true $p.Fonts
+& (Join-Path $SourceRoot ('Install-Monatendard' + $p.Suffix + '.ps1')) -FontDirectory $p.Fonts
+Assert-Family $p $true $p.Fonts
+& (Join-Path $SourceRoot ('Uninstall-Monatendard' + $p.Suffix + '.ps1'))
+Assert-Family $p $false $p.Fonts
+'@
+        ) -join "`r`n" | Set-Content -LiteralPath $harnessPath -Encoding UTF8
+        foreach ($p in $packages) {
+            $asset = $p.Asset.Replace('v0.2.3', 'v0.3.0')
+            $archive = Join-Path $legacyRoot $asset
+            $line = @($legacyChecksums | Where-Object { $_ -match ('^[0-9a-fA-F]{64}\s+\*?' + [regex]::Escape($asset) + '$') })
+            Assert-True ($line.Count -eq 1) "published v0.3.0 checksum exists for $asset"
+            Assert-True ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -eq ($line[0] -split '\s+')[0]) 'legacy archive matches official SHA256SUMS'
+            $extracted = Join-Path $legacyRoot $p.Name
+            Expand-Archive -LiteralPath $archive -DestinationPath $extracted
+            $packagePath = Join-Path $tempRoot ($p.Name + '-legacy-test.json')
+            $p | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $packagePath -Encoding UTF8
+            foreach ($action in @('Install', 'Uninstall')) {
+                Write-Host "TEST: $($p.Name) with v0.3.0 $action type preloaded"
+                $before = Get-FontRegistry
+                if ($action -eq 'Install') {
+                    & (Join-Path $PSScriptRoot ('Install-Monatendard' + $p.Suffix + '.ps1')) -FontDirectory $p.Fonts
+                    Assert-Family $p $true $p.Fonts
+                }
+                $legacyScript = Join-Path $extracted ($action + '-Monatendard' + $p.Suffix + '.ps1')
+                Invoke-Native "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $harnessPath, '-LegacyScript', $legacyScript, '-SourceRoot', $PSScriptRoot, '-PackagePath', $packagePath)
+                Assert-Family $p $false $p.Fonts
+                Assert-RegistryEqual $before (Get-FontRegistry)
+            }
+        }
         Write-Host 'TEST: checked-out ZIP scripts repeated in ONE Windows PowerShell 5.1 process'
         # Source font copies survive Scoop uninstall, with no remaining Scoop ownership.
         # Using & in THIS process deliberately exposes incompatible Add-Type reuse.
