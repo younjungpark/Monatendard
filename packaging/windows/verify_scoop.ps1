@@ -85,7 +85,11 @@ function Assert-Family($Package, [bool]$Installed, [string]$ArchiveFonts) {
     $expected = @(Get-ChildItem -LiteralPath $ArchiveFonts -Filter ($Package.Prefix + '*.ttf') -File)
     Assert-True ($expected.Count -eq 14) "$($Package.Name) archive has exactly 14 TTFs"
     $values = Get-FontRegistry
-    $familyNames = @($values.Keys | Where-Object { $_ -like ($Package.Family + ' * (TrueType)') })
+    # The standard family name is a prefix of the Nerd family; match file
+    # prefixes instead so removing one never counts the other's registrations.
+    $familyNames = @($values.Keys | Where-Object {
+        [IO.Path]::GetFileName([string]$values[$_]) -like ($Package.Prefix + '*.ttf')
+    })
     if (-not $Installed) {
         Assert-True ($actual.Count -eq 0 -and $familyNames.Count -eq 0) "$($Package.Name) completely removed"
         return
