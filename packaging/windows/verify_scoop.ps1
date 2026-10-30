@@ -219,10 +219,18 @@ try {
         # Using & in THIS process deliberately exposes incompatible Add-Type reuse.
         for ($cycle = 0; $cycle -lt 2; $cycle++) {
             foreach ($p in $packages) {
+                $before = Get-FontRegistry
+                & (Join-Path $PSScriptRoot ('Install-Monatendard' + $p.Suffix + '.ps1')) -FontDirectory $p.Fonts -WhatIf
+                Assert-RegistryEqual $before (Get-FontRegistry)
+                Assert-Family $p $false $p.Fonts
                 & (Join-Path $PSScriptRoot ('Install-Monatendard' + $p.Suffix + '.ps1')) -FontDirectory $p.Fonts
                 Assert-Family $p $true $p.Fonts
                 # Reinstall in the same session, exercising resource unloading.
                 & (Join-Path $PSScriptRoot ('Install-Monatendard' + $p.Suffix + '.ps1')) -FontDirectory $p.Fonts
+                Assert-Family $p $true $p.Fonts
+                $before = Get-FontRegistry
+                & (Join-Path $PSScriptRoot ('Uninstall-Monatendard' + $p.Suffix + '.ps1')) -WhatIf
+                Assert-RegistryEqual $before (Get-FontRegistry)
                 Assert-Family $p $true $p.Fonts
             }
             foreach ($p in $packages) {
