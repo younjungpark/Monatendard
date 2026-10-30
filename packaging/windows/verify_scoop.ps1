@@ -88,7 +88,9 @@ function Assert-Family($Package, [bool]$Installed, [string]$ArchiveFonts) {
     # The standard family name is a prefix of the Nerd family; match file
     # prefixes instead so removing one never counts the other's registrations.
     $familyNames = @($values.Keys | Where-Object {
-        [IO.Path]::GetFileName([string]$values[$_]) -like ($Package.Prefix + '*.ttf')
+        $value = [string]$values[$_]
+        $value -like (Join-Path $fontDir ($Package.Prefix + '*.ttf')) -or
+            $value -like ($Package.Prefix + '*.ttf')
     })
     if (-not $Installed) {
         Assert-True ($actual.Count -eq 0 -and $familyNames.Count -eq 0) "$($Package.Name) completely removed"
@@ -132,11 +134,22 @@ foreach ($name in $baseline.Keys) {
 $manualFile = $null
 $lock = $null
 $owned = $false
+$sentinelNames = @()
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $bucketRoot 'bucket') -Force | Out-Null
     $owned = $true
     New-Item -ItemType Directory -Path $fontDir -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $registry)) { New-Item -Path $registry -Force | Out-Null }
+    foreach ($p in $packages) {
+        $name = 'VC27 external ' + $p.Name
+        Assert-True (-not $baseline.ContainsKey($name)) 'test sentinel must not replace an existing value'
+        $external = Join-Path $tempRoot ('external\' + $p.Prefix + 'Regular.ttf')
+        New-ItemProperty -Path $registry -Name $name -Value $external -PropertyType String | Out-Null
+        $sentinelNames += $name
+    }
+    # Legacy ZIP uninstallers deleted these values solely by their basenames.
+    $baseline = Get-FontRegistry
     foreach ($p in $packages) {
         $p.Current = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ('bucket\' + $p.Name + '.json')) | ConvertFrom-Json
         $p.Fonts = Join-Path $tempRoot ($p.Name + '-fonts')
@@ -295,6 +308,9 @@ try {
             } catch { Write-Warning "Cleanup failed for $($p.Name): $_" }
         }
         Remove-Item -LiteralPath $bucketRoot -Recurse -Force
+    }
+    foreach ($name in $sentinelNames) {
+        Remove-ItemProperty -LiteralPath $registry -Name $name -ErrorAction SilentlyContinue
     }
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
 }

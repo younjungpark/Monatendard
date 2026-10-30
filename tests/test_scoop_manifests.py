@@ -23,12 +23,17 @@ def test_manifest_lifecycle_contract(package, prefix, script):
     assert "Existing manual font installation detected" in pre_install
     assert f"fonts\\{prefix}*.ttf" in pre_install
     assert "HKLM:" not in json.dumps(manifest)
-    for operation, filename in [("installer", "Install"), ("uninstaller", "Uninstall")]:
-        commands = "\n".join(manifest[operation]["script"])
-        assert "powershell.exe" in commands
-        assert "-NoProfile -NonInteractive" in commands
-        assert f"{filename}-{script}.ps1" in commands
-        assert "$LASTEXITCODE -ne 0" in commands
+    commands = "\n".join(manifest["installer"]["script"])
+    assert "powershell.exe" in commands
+    assert "-NoProfile -NonInteractive" in commands
+    assert f"Install-{script}.ps1" in commands
+    assert "$LASTEXITCODE -ne 0" in commands
+    removal = "\n".join(manifest["uninstaller"]["script"])
+    assert removal.index("Remove-Item -LiteralPath") < removal.index("Remove-ItemProperty")
+    assert "[string]$property.Value -eq $target" in removal
+    assert "[string]$property.Value -eq $font.Name" in removal
+    assert "Uninstall-Monatendard" not in removal
+    assert "SendMessageTimeout" in removal
     pre_uninstall = "\n".join(manifest["pre_uninstall"])
     assert f"fonts\\{prefix}*.ttf" in pre_uninstall
     assert "[IO.FileShare]::None" in pre_uninstall

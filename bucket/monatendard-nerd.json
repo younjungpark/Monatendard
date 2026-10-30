@@ -10,6 +10,10 @@
         "if ([Environment]::OSVersion.Version.Build -lt 17763) { throw 'Windows 10 1809 or later is required.' }",
         "$fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Fonts'",
         "foreach ($font in (Get-ChildItem \"$dir\\fonts\\MonatendardNFM-*.ttf\")) {",
+        "    $target = Join-Path $fontDir $font.Name",
+        "    $registry = 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'",
+        "    $name = 'Monatendard Nerd Font Mono ' + $font.BaseName.Substring('MonatendardNFM-'.Length) + ' (TrueType)'",
+        "    if (Test-Path -LiteralPath $registry) { $existing = (Get-ItemProperty -LiteralPath $registry).PSObject.Properties[$name]; if ($existing -and [string]$existing.Value -ne $target -and [string]$existing.Value -ne $font.Name) { throw 'Existing manual font registration detected. Remove the manually installed family before switching to Scoop.' } }",
         "    if (Test-Path -LiteralPath (Join-Path $fontDir $font.Name)) { throw 'Existing manual font installation detected. Close applications, uninstall the ZIP-installed family, then retry Scoop. No files were overwritten.' }",
         "}"
     ],
@@ -42,8 +46,22 @@
     ],
     "uninstaller": {
         "script": [
-            "& \"$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$dir\\Uninstall-Monatendard-Nerd.ps1\"",
-            "if ($LASTEXITCODE -ne 0) { throw 'Font removal failed. Close applications using the font and retry; inspect the error above.' }"
+            "$fontDir = Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Fonts'",
+            "$registry = 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'",
+            "$fonts = @(Get-ChildItem \"$dir\\fonts\\MonatendardNFM-*.ttf\" -ErrorAction Stop)",
+            "foreach ($font in $fonts) { $target = Join-Path $fontDir $font.Name; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction Stop } }",
+            "if (Test-Path -LiteralPath $registry) {",
+            "    $properties = (Get-ItemProperty -LiteralPath $registry -ErrorAction Stop).PSObject.Properties",
+            "    foreach ($property in $properties) {",
+            "        if ($property.Name -like 'PS*') { continue }",
+            "        foreach ($font in $fonts) {",
+            "            $target = Join-Path $fontDir $font.Name",
+            "            if (([string]$property.Value -eq $target -or [string]$property.Value -eq $font.Name) -and -not (Test-Path -LiteralPath $target)) { Remove-ItemProperty -LiteralPath $registry -Name $property.Name -ErrorAction Stop; break }",
+            "        }",
+            "    }",
+            "}",
+            "if (-not ('MonatendardScoopNotifyApi' -as [type])) { Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class MonatendardScoopNotifyApi { [DllImport(\"user32.dll\")] public static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam, uint flags, uint timeout, out UIntPtr result); }' -ErrorAction Stop }",
+            "$result = [UIntPtr]::Zero; [void][MonatendardScoopNotifyApi]::SendMessageTimeout([IntPtr]0xffff, 0x001D, [UIntPtr]::Zero, [IntPtr]::Zero, 0x0002, 5000, [ref]$result)"
         ]
     },
     "notes": "Includes OFL-1.1 fonts and MIT-licensed Nerd Font symbols; see LICENSES in the package. Restart editors and terminals and select Monatendard Nerd Font Mono. Close applications using this family before updating or uninstalling."
