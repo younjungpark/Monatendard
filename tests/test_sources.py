@@ -38,7 +38,7 @@ def test_unknown_variant_values_are_rejected() -> None:
 
 def test_lock_pins_required_versions_scale_and_sha256() -> None:
     lock = load_lock()
-    assert lock["project"]["version"] == __version__ == "0.3.0"
+    assert lock["project"]["version"] == __version__ == "0.3.1"
     assert lock["project"]["latin_horizontal_scale"] == 1.0
     assert lock["project"]["latin_advance_em"] == 0.620
     assert lock["project"]["cjk_horizontal_scale"] == 1.15

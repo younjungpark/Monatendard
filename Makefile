@@ -25,7 +25,7 @@ verify:
 	uv run monatendard verify --nerd
 
 package:
-	uv run monatendard package --version 0.3.0
+	uv run monatendard package --version 0.3.1
 
 # 공식 배포하지 않는 선택 빌드. 출력은 build/profiles/compact/이다.
 compact:

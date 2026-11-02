@@ -160,7 +160,7 @@ uv run monatendard verify --profile compact --nerd
 - `monatendard build-nerd`: 일반판에 고정된 Nerd Fonts Symbols Only 아이콘을 병합합니다.
 - `monatendard verify`: 이름, 폭, 한글 글리프, 리게이처, 테이블 무결성을 확인합니다.
 - `monatendard verify --nerd`: Nerd 패밀리명, 필수 아이콘과 한 칸 폭을 추가 검사합니다.
-- `monatendard package --version 0.3.0`: Desktop/Desktop-Nerd/Web ZIP과 체크섬을 만듭니다.
+- `monatendard package --version 0.3.1`: Desktop/Desktop-Nerd/Web ZIP과 체크섬을 만듭니다.
 
 `Makefile`은 개발자용 단축 명령일 뿐이며 사용자 설치 과정에는 필요하지 않습니다.
 
@@ -168,7 +168,7 @@ uv run monatendard verify --profile compact --nerd
 
 | 항목 | 값 |
 |---|---|
-| Monatendard | 0.3.0 |
+| Monatendard | 0.3.1 |
 | Monaspace Neon | 1.400 |
 | Pretendard | 1.3.9 |
 | Nerd Fonts Symbols Only | 3.4.0 |
