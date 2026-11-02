@@ -1,10 +1,13 @@
 {
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Monatendard Nerd Font Mono with terminal icons (14 styles)",
     "homepage": "https://monatendard.github.io/",
-    "license": {"identifier": "OFL-1.1", "url": "https://github.com/younjungpark/Monatendard/blob/main/LICENSE"},
-    "url": "https://github.com/younjungpark/Monatendard/releases/download/v0.3.0/Monatendard-v0.3.0-Desktop-Nerd.zip",
-    "hash": "2a1f81077f6b8306801587c842eac64666bd01b7705c36490de3603b831aa0cb",
+    "license": {
+        "identifier": "OFL-1.1",
+        "url": "https://github.com/younjungpark/Monatendard/blob/main/LICENSE"
+    },
+    "url": "https://github.com/younjungpark/Monatendard/releases/download/v0.3.1/Monatendard-v0.3.1-Desktop-Nerd.zip",
+    "hash": "89323c8a69b8f821c62197c5ee59f9ccbd54ac924bba9612f7eb657a8a7a4ba5",
     "pre_install": [
         "if ($global) { throw 'Only per-user installation is supported. Do not use -g.' }",
         "if ([Environment]::OSVersion.Version.Build -lt 17763) { throw 'Windows 10 1809 or later is required.' }",
