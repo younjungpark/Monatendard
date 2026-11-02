@@ -314,6 +314,26 @@ def _safe_vertical_bounds(font: TTFont) -> tuple[int, int]:
     return minimum, maximum
 
 
+def distribute_line_gap(font: TTFont) -> None:
+    """lineGap을 ascent와 descent에 나눠 담는다.
+
+    lineGap을 무시하는 앱에서도 같은 줄 높이를 쓰게 한다. 위아래로 같은 양을 옮기므로
+    기본 줄 높이와 줄 상자의 세로 중심은 그대로다. win 값은 합계가 어긋나지 않도록 맞춘다.
+    """
+    hhea = cast("Any", font["hhea"])
+    os2 = cast("Any", font["OS/2"])
+    line_gap = int(hhea.lineGap)
+    top = line_gap // 2
+    bottom = line_gap - top
+    ascent = int(hhea.ascent) + top
+    descent = int(hhea.descent) - bottom
+
+    hhea.ascent = os2.sTypoAscender = os2.usWinAscent = ascent
+    hhea.descent = os2.sTypoDescender = descent
+    os2.usWinDescent = -descent
+    hhea.lineGap = os2.sTypoLineGap = 0
+
+
 def _fit_cjk_transform(
     bounds: tuple[float, float, float, float] | None,
     *,
@@ -584,6 +604,7 @@ def build_font(
             profile.cjk_horizontal_scale,
             profile.cjk_vertical_scale,
         )
+        distribute_line_gap(target)
         update_metadata(target, variant, version, profile.family)
         target.recalcTimestamp = False
 

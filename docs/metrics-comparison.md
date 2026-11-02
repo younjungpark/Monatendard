@@ -33,6 +33,7 @@
 - 한글 세로÷가로 비는 각 글자의 세로 배율을 가로 배율로 나눈 값의 평균이다. Pretendard 원본 비율이면 1이다.
 - 한글 글자 사이 여백은 `1 − 한글 평균 폭 ÷ 한글 셀 폭`이다.
 - 기본 줄 높이는 `hhea` ascent − descent + lineGap이다. Windows Terminal에서 `cellHeight`를 지정하면 이 값 대신 그 값을 쓴다.
+- 위 표는 2026-10-05 기준이다. 이후 빌드는 lineGap 0.1em을 ascent와 descent에 0.05em씩 옮긴다. 기본 줄 높이 1.245em과 줄 상자의 세로 중심은 그대로이고, lineGap을 무시하는 앱에서만 줄이 넓어진다. Herdr(22.4px)에서 측정한 값은 30px에서 33px로 늘었다.
 
 ## 읽는 법
 
