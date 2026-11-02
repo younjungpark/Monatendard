@@ -1,6 +1,6 @@
 cask "font-monatendard-nerd-font" do
-  version "0.3.0"
-  sha256 "2a1f81077f6b8306801587c842eac64666bd01b7705c36490de3603b831aa0cb"
+  version "0.3.1"
+  sha256 "89323c8a69b8f821c62197c5ee59f9ccbd54ac924bba9612f7eb657a8a7a4ba5"
 
   url "https://github.com/younjungpark/Monatendard/releases/download/v#{version}/Monatendard-v#{version}-Desktop-Nerd.zip"
   name "Monatendard Nerd Font Mono"
