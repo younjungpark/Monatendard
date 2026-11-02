@@ -1,10 +1,10 @@
 {
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Korean coding font pairing Monaspace Neon with Pretendard (14 styles)",
     "homepage": "https://monatendard.github.io/",
     "license": "OFL-1.1",
-    "url": "https://github.com/younjungpark/Monatendard/releases/download/v0.3.0/Monatendard-v0.3.0-Desktop.zip",
-    "hash": "4266d47a4e2605fb9aeaa07b7b197d74ff36174510fbdb8ae4e2b922d1691fc3",
+    "url": "https://github.com/younjungpark/Monatendard/releases/download/v0.3.1/Monatendard-v0.3.1-Desktop.zip",
+    "hash": "c05361791d11dfac3d666e7bba7bbd09fca89cf1ac741f488a79da3ca0f56d49",
     "pre_install": [
         "if ($global) { throw 'Only per-user installation is supported. Do not use -g.' }",
         "if ([Environment]::OSVersion.Version.Build -lt 17763) { throw 'Windows 10 1809 or later is required.' }",
