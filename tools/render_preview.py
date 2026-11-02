@@ -5,6 +5,10 @@ Windows의 Edge(Chromium)는 글꼴을 DirectWrite로 그리므로 Windows Termi
 
     uv run monatendard build-nerd --variants Regular
     uv run python tools/render_preview.py
+
+README 이미지는 같은 화면을 터미널에 출력해 캡처한 뒤 터미널 영역만 잘라 만든다.
+
+    uv run python tools/render_preview.py --ansi
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ import argparse
 import html
 import shutil
 import subprocess
+import sys
 import tempfile
 import unicodedata
 from pathlib import Path
@@ -115,7 +120,7 @@ def workspace(indent: str) -> list[Line]:
     out.append("│" + row("Monaspace ligatures preserved") + "│")
     out.append("├" + "─" * full + "┤")
     out.append(
-        "│" + row(f"\uf126 main \ue0b1 tests: 44 passed \ue0b1 v{__version__}") + "│"
+        "│" + row(f"\uf126 main \ue0b1 tests: 111 passed \ue0b1 v{__version__}") + "│"
     )
     out.append("└" + "─" * full + "┘")
     return [[(indent, ""), (line, "")] for line in out]
@@ -162,6 +167,26 @@ def line_height(font: Path) -> float:
         return (os2.usWinAscent + os2.usWinDescent) / ttf["head"].unitsPerEm
 
 
+ANSI_STYLES = {
+    "accent": "\x1b[38;2;215;119;87m",
+    "dim": "\x1b[38;2;138;138;138m",
+    "bold": "\x1b[1;97m",
+    "ok": "\x1b[38;2;78;186;101m",
+}
+
+
+def render_ansi() -> str:
+    """같은 화면을 터미널용 ANSI 문자열로 만든다."""
+    lines = []
+    for line in screen():
+        lines.append(
+            "".join(
+                f"{ANSI_STYLES[style]}{text}\x1b[0m" if style else text for text, style in line
+            )
+        )
+    return "\n".join(lines)
+
+
 def render_html(font: Path) -> str:
     lines = []
     for line in screen():
@@ -193,7 +218,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--font", type=Path, default=FONT)
     parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--ansi", action="store_true", help="화면을 터미널에 출력한다")
     args = parser.parse_args()
+
+    if args.ansi:
+        sys.stdout.reconfigure(encoding="utf-8")
+        print(render_ansi())
+        return 0
 
     if not args.font.exists():
         parser.error(f"글꼴이 없습니다: {args.font}. 먼저 build-nerd를 실행하세요.")
