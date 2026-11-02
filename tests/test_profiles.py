@@ -8,11 +8,12 @@ from fontTools.ttLib.tables import ttProgram
 
 from monatendard.builder import (
     _fit_cjk_transform,
+    distribute_line_gap,
     load_profile,
     profile_names,
     scale_latin_horizontally,
 )
-from monatendard.verify import _check_latin_hinting
+from monatendard.verify import _check_latin_hinting, _check_vertical_metrics
 
 UNITS_PER_EM = 2000
 ADVANCE = 1240
@@ -93,6 +94,36 @@ def _hinted_font() -> TTFont:
     cvt.values = [0]
     builder.font["cvt "] = cvt
     return builder.font
+
+
+def _font_with_line_gap() -> TTFont:
+    font = _hinted_font()
+    font["hhea"].lineGap = 200
+    os2 = font["OS/2"]
+    os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap = 1890, -400, 200
+    os2.usWinAscent, os2.usWinDescent = 1890, 500
+    return font
+
+
+def test_line_gap_moves_into_ascent_and_descent() -> None:
+    font = _font_with_line_gap()
+
+    distribute_line_gap(font)
+
+    hhea, os2 = font["hhea"], font["OS/2"]
+    assert (hhea.ascent, hhea.descent, hhea.lineGap) == (1990, -500, 0)
+    assert (os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap) == (1990, -500, 0)
+    assert (os2.usWinAscent, os2.usWinDescent) == (1990, 500)
+    assert hhea.ascent - hhea.descent == 1890 + 400 + 200
+    assert (hhea.ascent + hhea.descent) == (1890 - 400)
+    assert _check_vertical_metrics(font) == []
+
+
+def test_vertical_metrics_check_reports_line_gap() -> None:
+    errors = _check_vertical_metrics(_font_with_line_gap())
+
+    assert any("lineGap" in error for error in errors)
+    assert any("세로 메트릭" in error for error in errors)
 
 
 def test_unscaled_latin_keeps_outlines_and_hinting() -> None:

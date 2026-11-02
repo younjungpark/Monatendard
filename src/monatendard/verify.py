@@ -60,6 +60,23 @@ def _check_latin_hinting(font: TTFont, cmap: dict[int, str]) -> list[str]:
     return errors
 
 
+def _check_vertical_metrics(font: TTFont) -> list[str]:
+    """lineGap이 0이고 hhea, typo, win 세로 메트릭이 서로 같은지 확인한다."""
+    hhea = font["hhea"]
+    os2 = font["OS/2"]
+    errors: list[str] = []
+    if hhea.lineGap != 0 or os2.sTypoLineGap != 0:
+        errors.append(f"lineGap이 0이 아닙니다: hhea={hhea.lineGap}, typo={os2.sTypoLineGap}")
+    metrics = {
+        "hhea": (hhea.ascent, hhea.descent),
+        "typo": (os2.sTypoAscender, os2.sTypoDescender),
+        "win": (os2.usWinAscent, -os2.usWinDescent),
+    }
+    if len(set(metrics.values())) != 1:
+        errors.append(f"세로 메트릭이 서로 다릅니다: {metrics}")
+    return errors
+
+
 def verify_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
     """한 글꼴을 검사하고 실패 사유를 반환한다."""
     profile = profile or load_profile()
@@ -149,6 +166,8 @@ def verify_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
 
         if profile.keeps_latin_outlines:
             errors.extend(_check_latin_hinting(font, cmap))
+
+        errors.extend(_check_vertical_metrics(font))
 
         if not cast_fixed_pitch(font):
             errors.append("고정폭 메타데이터가 설정되지 않았습니다.")
