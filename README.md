@@ -122,6 +122,40 @@ To remove the fonts:
 brew uninstall --cask font-monatendard font-monatendard-nerd-font
 ```
 
+### Linux
+
+Installs into the current user's font directory (`${XDG_DATA_HOME:-$HOME/.local/share}/fonts`)
+on `fontconfig`-based desktop Linux distributions. Running as `root`/`sudo` is not supported.
+Requires `bash`, `fc-cache`, `unzip`, `sha256sum`, and `curl` (or `wget`).
+
+```sh
+# Install or update the standard family
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash
+
+# Install or update the Nerd family
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --nerd
+
+# Install or update both families
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --all
+```
+
+Check installation status or remove managed installations:
+
+```sh
+# Check installed status and version
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --status
+
+# Uninstall (standard / Nerd / both)
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --nerd --uninstall
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --all --uninstall
+```
+
+Restart your editor or terminal after installing, then select `Monatendard` or
+`Monatendard Nerd Font Mono`. Existing manual font files are never overwritten.
+See [Linux packaging notes](packaging/linux/README.md) for `--dry-run`, conflict
+handling, and recovery details.
+
 ### VS Code
 
 Open **Settings (JSON)** and add:

@@ -9,8 +9,8 @@
 - **일반판**(`Monatendard`): 정식 Desktop ZIP의 TTF 14개 → `${XDG_DATA_HOME:-$HOME/.local/share}/fonts/monatendard`.
 - **Nerd판**(`Monatendard Nerd Font Mono`): 정식 Desktop-Nerd ZIP의 TTF 14개 → `${XDG_DATA_HOME:-$HOME/.local/share}/fonts/monatendard-nerd`.
 - **Compact**, 사전 릴리스, 배포판별 패키지 매니저(AUR/APT/RPM/Nix 등), ZIP 동봉 스크립트, 최소 컨테이너(Alpine/BusyBox), WSL의 Windows 측 등록은 이번 범위에서 제외한다. 설계 배경은 [ADR-0001](../../docs/adr/0001-linux-bash-installer-with-pinned-checksums.md)을 참고한다.
-- 대외 안내(`README.md`, `README.ko.md`)는 다음 정식 폰트 릴리스에 맞춰 공개하며, 저장소 내 초기 고정값은 CI 실제 E2E 검증을 위해 `0.3.1`로 유지한다.
-- 필수 도구: `bash`, `fc-cache`(`fontconfig`), 설치 시 `curl` 또는 `wget`, `unzip`, `sha256sum`.
+- 대외 안내는 [README.md](../../README.md)와 [README.ko.md](../../README.ko.md)에서 제공하며, 고정값은 정식 릴리스마다 자동 갱신 PR로 최신 정식 버전에 맞춘다.
+- 필수 도구: `bash`, `fc-cache`(`fontconfig`), 설치 시 `curl` 또는 `wget`, `unzip`, `sha256sum`. (`--status`, `--version`, `--help`는 추가 도구 없이 동작한다.)
 
 ## 사용자 명령
 
@@ -35,9 +35,12 @@ bash install.sh --dry-run
 bash install.sh
 ```
 
-제거와 기타 옵션:
+상태 확인, 제거와 기타 옵션:
 
 ```sh
+# 설치 상태·버전·충돌 여부 확인 (기본: 두 패밀리 모두, --nerd 지정 시 Nerd판만)
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --status
+
 # 일반판 관리 설치본 제거
 curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --uninstall
 

@@ -15,6 +15,7 @@ from monatendard.builder import (
     _fit_cjk_transform,
     _glyph_bounds,
     _redraw_scaled_glyph,
+    _ribbi_names,
     _safe_vertical_bounds,
     _set_name,
     derive_monospace_advance,
@@ -42,6 +43,25 @@ REQUIRED_NERD_CODEPOINTS = (
     0xF489,
     0xF0001,
 )
+NERD_NON_PUA_CODEPOINTS = frozenset(
+    {
+        0x23FB,  # IEC Power Symbol
+        0x23FC,  # IEC Power On-Off Symbol
+        0x23FD,  # IEC Power On Symbol
+        0x23FE,  # IEC Power Sleep Symbol
+        0x2630,  # Trigram for Heaven
+        0x2665,  # Black Heart Suit
+        0x26A1,  # High Voltage Sign
+        0x276C,  # Medium Left-Pointing Angle Bracket Ornament
+        0x276D,  # Medium Right-Pointing Angle Bracket Ornament
+        0x276E,  # Heavy Left-Pointing Angle Quotation Mark Ornament
+        0x276F,  # Heavy Right-Pointing Angle Quotation Mark Ornament
+        0x2770,  # Heavy Left-Pointing Angle Bracket Ornament
+        0x2771,  # Heavy Right-Pointing Angle Bracket Ornament
+        0x2B58,  # Heavy Circle (IEC Power Off)
+    }
+)
+REQUIRED_NERD_NON_PUA_CODEPOINTS = (0x23FB, 0x2665, 0x276C, 0x276D)
 CENTERED_NERD_CODEPOINTS = (0xF00C, 0xF07C, 0xF126, 0xF489, 0xF0001)
 
 
@@ -62,6 +82,11 @@ def is_private_use(codepoint: int) -> bool:
         or 0xF0000 <= codepoint <= 0xFFFFD
         or 0x100000 <= codepoint <= 0x10FFFD
     )
+
+
+def is_nerd_symbol(codepoint: int) -> bool:
+    """Nerd Fonts Symbols Only에서 가져올 PUA 및 공식 비-PUA 심볼인지 판단한다."""
+    return is_private_use(codepoint) or codepoint in NERD_NON_PUA_CODEPOINTS
 
 
 def _update_unicode_cmaps(font: TTFont, codepoint: int, glyph_name: str) -> None:
@@ -86,7 +111,7 @@ def _vertical_center_shift(
 
 
 def merge_nerd_symbols(font: TTFont, symbols_font: TTFont, latin_advance: int) -> int:
-    """기존 글리프는 보존하고 비어 있는 Nerd PUA 글리프를 한 칸 폭으로 복사한다."""
+    """기존 글리프는 보존하고 비어 있는 Nerd 심볼 글리프를 한 칸 폭으로 복사한다."""
     source_cmap = symbols_font.getBestCmap()
     target_cmap = font.getBestCmap()
     if not source_cmap:
@@ -116,7 +141,7 @@ def merge_nerd_symbols(font: TTFont, symbols_font: TTFont, latin_advance: int) -
     mapped = 0
     copied_names: dict[str, str] = {}
     for codepoint, source_name in sorted(source_cmap.items()):
-        if not is_private_use(codepoint) or codepoint in target_cmap:
+        if not is_nerd_symbol(codepoint) or codepoint in target_cmap:
             continue
         if source_name not in source_glyph_set:
             continue
@@ -169,14 +194,16 @@ def update_nerd_metadata(
     family_name: str = NERD_FAMILY_NAME,
     file_prefix: str = NERD_FILE_PREFIX,
 ) -> None:
-    """일반판과 충돌하지 않는 Nerd 전용 패밀리 이름을 설정한다."""
+    """일반판과 충돌하지 않는 Nerd 전용 패밀리 이름을 RIBBI 규칙에 맞게 설정한다."""
+    legacy_family, legacy_subfamily = _ribbi_names(family_name, variant)
     postscript_subfamily = variant.subfamily_name.replace(" ", "")
+    full_name = f"{family_name} {variant.subfamily_name}"
     postscript_name = f"{file_prefix}-{postscript_subfamily}"
     values = {
-        1: family_name,
-        2: variant.subfamily_name,
+        1: legacy_family,
+        2: legacy_subfamily,
         3: f"{postscript_name};{project_version}",
-        4: f"{family_name} {variant.subfamily_name}",
+        4: full_name,
         5: f"Version {project_version}",
         6: postscript_name,
         13: (
@@ -186,6 +213,8 @@ def update_nerd_metadata(
         14: "https://github.com/younjungpark/Monatendard",
         16: family_name,
         17: variant.subfamily_name,
+        18: full_name,
+        19: f'printf("Hello, {family_name}!")',
     }
     for name_id, value in values.items():
         _set_name(font, name_id, value)

@@ -25,7 +25,7 @@ verify:
 	uv run monatendard verify --nerd
 
 package:
-	uv run monatendard package --version 0.3.1
+	uv run python -c "from monatendard.sources import load_lock; from monatendard.cli import main; raise SystemExit(main(['package', '--version', load_lock()['project']['version']]))"
 
 # 공식 배포하지 않는 선택 빌드. 출력은 build/profiles/compact/이다.
 compact:

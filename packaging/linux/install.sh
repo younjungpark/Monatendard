@@ -84,6 +84,7 @@ Options:
   --nerd        Target Monatendard Nerd Font Mono instead of standard
   --all         Target both Monatendard and Monatendard Nerd Font Mono
   --uninstall   Remove managed installation for the selected family
+  --status      Show installation status for selected families and exit
   --dry-run     Show planned actions without modifying files or font cache
   --version     Print the pinned release version and exit
   -h, --help    Show this help message and exit
@@ -164,6 +165,10 @@ check_tools() {
     local action="$1"
     local missing=()
     local tool
+
+    if [[ "$action" == "status" ]]; then
+        return 0
+    fi
 
     if ! command -v fc-cache >/dev/null 2>&1; then
         missing+=("fc-cache (fontconfig)")
@@ -465,6 +470,82 @@ uninstall_family() {
     return 0
 }
 
+status_family() {
+    local family="$1"
+    local user_font_root="$2"
+    local target_dir="${user_font_root}/${family}"
+    local marker_path="${target_dir}/${MARKER_NAME}"
+    local display_name glob_pattern
+    display_name="$(family_display_name "$family")"
+    glob_pattern="$(family_glob "$family")"
+
+    local scan_roots=()
+    if [[ -d "$user_font_root" ]]; then
+        scan_roots+=("$user_font_root")
+    fi
+    local home_norm="${HOME%/}"
+    local legacy_root="${home_norm}/.fonts"
+    if [[ -d "$legacy_root" && "$legacy_root" != "$user_font_root" ]]; then
+        scan_roots+=("$legacy_root")
+    fi
+
+    local external_files=()
+    local root_dir found
+    for root_dir in "${scan_roots[@]:-}"; do
+        if [[ -z "$root_dir" ]]; then
+            continue
+        fi
+        while IFS= read -r -d '' found; do
+            case "$found" in
+                "${target_dir}/"*) continue ;;
+                *) external_files+=("$found") ;;
+            esac
+        done < <(find -H "$root_dir" -mindepth 1 \( -type f -o -type l \) -name "$glob_pattern" -print0)
+    done
+
+    local path
+    if [[ -e "$target_dir" || -L "$target_dir" ]]; then
+        if ( validate_managed_dir "$family" "$target_dir" ) >/dev/null 2>&1; then
+            local installed_version="unknown"
+            local line
+            while IFS= read -r line; do
+                case "$line" in
+                    version=*) installed_version="${line#version=}" ;;
+                esac
+            done < "$marker_path"
+
+            if [[ "${#external_files[@]}" -gt 0 ]]; then
+                printf '%s: conflict (managed v%s at %s; manual files also found)\n' \
+                    "$display_name" "$installed_version" "$target_dir"
+                for path in "${external_files[@]}"; do
+                    printf '  - %s\n' "$path"
+                done
+            elif [[ "$installed_version" == "$RELEASE_VERSION" ]]; then
+                printf '%s: installed (managed, v%s, up-to-date) at %s\n' \
+                    "$display_name" "$installed_version" "$target_dir"
+            else
+                printf '%s: installed (managed, v%s, update available: v%s) at %s\n' \
+                    "$display_name" "$installed_version" "$RELEASE_VERSION" "$target_dir"
+            fi
+        else
+            printf '%s: manual or unmanaged installation detected (%s)\n' \
+                "$display_name" "$target_dir"
+            for path in "${external_files[@]:-}"; do
+                if [[ -n "$path" ]]; then
+                    printf '  - %s\n' "$path"
+                fi
+            done
+        fi
+    elif [[ "${#external_files[@]}" -gt 0 ]]; then
+        printf '%s: manual installation detected\n' "$display_name"
+        for path in "${external_files[@]}"; do
+            printf '  - %s\n' "$path"
+        done
+    else
+        printf '%s: not installed\n' "$display_name"
+    fi
+}
+
 main() {
     local target="default"
     local action="install"
@@ -487,7 +568,16 @@ main() {
                 target="all"
                 ;;
             --uninstall)
+                if [[ "$action" == "status" ]]; then
+                    die "Conflicting options: cannot combine --uninstall with --status."
+                fi
                 action="uninstall"
+                ;;
+            --status)
+                if [[ "$action" == "uninstall" ]]; then
+                    die "Conflicting options: cannot combine --status with --uninstall."
+                fi
+                action="status"
                 ;;
             --dry-run)
                 dry_run=1
@@ -521,6 +611,10 @@ main() {
         exit 0
     fi
 
+    if [[ "$action" == "status" && "$dry_run" -eq 1 ]]; then
+        die "--dry-run cannot be combined with --status."
+    fi
+
     check_environment
     check_tools "$action"
 
@@ -531,13 +625,26 @@ main() {
 
     local families=()
     case "$target" in
-        default) families=("monatendard") ;;
+        default)
+            if [[ "$action" == "status" ]]; then
+                families=("monatendard" "monatendard-nerd")
+            else
+                families=("monatendard")
+            fi
+            ;;
         nerd) families=("monatendard-nerd") ;;
         all) families=("monatendard" "monatendard-nerd") ;;
     esac
 
-    # Preflight conflict check across every selected family before touching disk.
     local family
+    if [[ "$action" == "status" ]]; then
+        for family in "${families[@]}"; do
+            status_family "$family" "$user_font_root"
+        done
+        return 0
+    fi
+
+    # Preflight conflict check across every selected family before touching disk.
     for family in "${families[@]}"; do
         check_conflicts_for_family "$family" "$user_font_root"
     done

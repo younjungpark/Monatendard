@@ -18,7 +18,7 @@ Monatendard는 위 Reserved Font Name을 최종 패밀리 이름으로 사용하
 
 Monatendard는 위 Reserved Font Name을 최종 패밀리 이름으로 사용하지 않습니다.
 
-## Nerd Fonts Symbols Only 3.4.0
+## Nerd Fonts Symbols Only 3.5.1
 
 - 원본: https://github.com/ryanoasis/nerd-fonts
 - 저작권: Copyright (c) 2014 Ryan L McIntyre

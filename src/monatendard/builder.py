@@ -160,18 +160,36 @@ class BuildStats:
     hangul_advance: int
 
 
-def is_cjk(codepoint: int) -> bool:
-    """Pretendard에서 가져올 한글 및 CJK 관련 범위인지 판단한다."""
-    return (
+def cjk_cell_span(codepoint: int) -> int | None:
+    """Pretendard에서 가져올 문자와 목표 셀 폭(1 또는 2)을 반환한다."""
+    if (
         0x1100 <= codepoint <= 0x11FF
+        or 0x3000 <= codepoint <= 0x303F
+        or 0x3040 <= codepoint <= 0x309F
+        or 0x30A0 <= codepoint <= 0x30FF
         or 0x3130 <= codepoint <= 0x318F
+        or 0x3200 <= codepoint <= 0x32FF
+        or 0x3300 <= codepoint <= 0x33FF
+        or 0x4E00 <= codepoint <= 0x9FFF
         or 0xA960 <= codepoint <= 0xA97F
         or 0xAC00 <= codepoint <= 0xD7A3
         or 0xD7B0 <= codepoint <= 0xD7FF
-        or 0x3000 <= codepoint <= 0x303F
-        or 0x4E00 <= codepoint <= 0x9FFF
-        or 0xFF00 <= codepoint <= 0xFFEF
-    )
+        or 0xFF01 <= codepoint <= 0xFF60
+        or 0xFFE0 <= codepoint <= 0xFFE6
+    ):
+        return 2
+    if (
+        codepoint == 0x203B
+        or 0xFF61 <= codepoint <= 0xFFDC
+        or 0xFFE8 <= codepoint <= 0xFFEE
+    ):
+        return 1
+    return None
+
+
+def is_cjk(codepoint: int) -> bool:
+    """Pretendard에서 가져올 한글 및 CJK 관련 범위인지 판단한다."""
+    return cjk_cell_span(codepoint) is not None
 
 
 def is_cell_connecting(codepoint: int) -> bool:
@@ -425,7 +443,6 @@ def merge_cjk(
     cjk_glyph_set = cjk_font.getGlyphSet()
     target_glyf = font["glyf"]
     target_hmtx = font["hmtx"]
-    target_advance = latin_advance * 2
     safe_ymin, safe_ymax = _safe_vertical_bounds(font)
     normalized_scale = (
         cast("Any", font["head"]).unitsPerEm / cast("Any", cjk_font["head"]).unitsPerEm
@@ -442,6 +459,8 @@ def merge_cjk(
             continue
         if source_name not in cjk_glyph_set:
             continue
+        span = cjk_cell_span(codepoint) or 2
+        target_advance = latin_advance * span
         target_name = f"mduni{codepoint:04X}"
         source_bounds = _glyph_bounds(cjk_glyph_set, source_name)
         if uniform:
@@ -500,6 +519,20 @@ def _set_name(font: TTFont, name_id: int, value: str) -> None:
     name_table.setName(value, name_id, 1, 0, 0)
 
 
+RIBBI_WEIGHTS = frozenset({"Regular", "Bold"})
+
+
+def _ribbi_names(family_name: str, variant: Variant) -> tuple[str, str]:
+    """OpenType RIBBI(Regular/Italic/Bold/Bold Italic) 규칙에 맞는 name ID 1·2를 만든다."""
+    if variant.weight_name in RIBBI_WEIGHTS:
+        return family_name, variant.subfamily_name
+    legacy_family = f"{family_name} {variant.weight_name}"
+    if len(legacy_family) > 31 and "Nerd Font Mono" in legacy_family:
+        legacy_family = legacy_family.replace("Nerd Font Mono", "NFM")
+    legacy_subfamily = "Italic" if variant.is_italic else "Regular"
+    return legacy_family, legacy_subfamily
+
+
 def update_metadata(
     font: TTFont,
     variant: Variant,
@@ -507,14 +540,15 @@ def update_metadata(
     family_name: str = FAMILY_NAME,
 ) -> None:
     """패밀리·스타일·버전·라이선스 메타데이터를 Monatendard로 고정한다."""
+    legacy_family, legacy_subfamily = _ribbi_names(family_name, variant)
     postscript_family = family_name.replace(" ", "")
     postscript_subfamily = variant.subfamily_name.replace(" ", "")
     full_name = f"{family_name} {variant.subfamily_name}"
     postscript_name = f"{postscript_family}-{postscript_subfamily}"
 
     values = {
-        1: family_name,
-        2: variant.subfamily_name,
+        1: legacy_family,
+        2: legacy_subfamily,
         3: f"{postscript_name};{project_version}",
         4: full_name,
         5: f"Version {project_version}",
@@ -526,6 +560,8 @@ def update_metadata(
         14: "https://openfontlicense.org",
         16: family_name,
         17: variant.subfamily_name,
+        18: full_name,
+        19: f'printf("Hello, {family_name}!")',
     }
     for name_id, value in values.items():
         _set_name(font, name_id, value)
@@ -542,15 +578,19 @@ def update_metadata(
     fs_italic = 1 << 0
     fs_bold = 1 << 5
     fs_regular = 1 << 6
+    fs_use_typo_metrics = 1 << 7
     head.macStyle &= ~(mac_bold | mac_italic)
     os2.fsSelection &= ~(fs_italic | fs_bold | fs_regular)
+    os2.fsSelection |= fs_use_typo_metrics
+
+    is_ribbi_bold = variant.weight_name == "Bold"
     if variant.is_italic:
         head.macStyle |= mac_italic
         os2.fsSelection |= fs_italic
-    if variant.css_weight >= 700:
+    if is_ribbi_bold:
         head.macStyle |= mac_bold
         os2.fsSelection |= fs_bold
-    if variant.weight_name == "Regular" and not variant.is_italic:
+    if not is_ribbi_bold and not variant.is_italic:
         os2.fsSelection |= fs_regular
 
     os2.usWeightClass = variant.css_weight

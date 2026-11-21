@@ -9,6 +9,7 @@ from fontTools.ttLib import TTFont
 
 from monatendard.builder import (
     ASCII_SAMPLE,
+    DEFAULT_PROFILE,
     REQUIRED_HANGUL,
     BuildProfile,
     _glyph_bounds,
@@ -19,6 +20,7 @@ from monatendard.nerd import (
     CENTERED_NERD_CODEPOINTS,
     NERD_ICON_VERTICAL_OFFSET_EM,
     REQUIRED_NERD_CODEPOINTS,
+    REQUIRED_NERD_NON_PUA_CODEPOINTS,
     build_nerd_font,
 )
 from monatendard.sources import VARIANTS_BY_SUFFIX
@@ -28,6 +30,14 @@ HINTING_TABLES = ("fpgm", "prep", "cvt ")
 HINTED_SAMPLE = "Aao"
 REQUIRED_TABLES = {"cmap", "glyf", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post"}
 LIGATURE_FEATURES = {"liga", "calt", *(f"ss{number:02d}" for number in range(1, 11))}
+REQUIRED_WIDE_CJK = (0x3042, 0x30A2, 0x321C, 0x339E)
+REQUIRED_HALFWIDTH_CJK = (0x203B, 0xFFA1)
+RIBBI_SUBFAMILIES = {
+    "Regular": (0, 1 << 6),
+    "Italic": (1 << 1, 1 << 0),
+    "Bold": (1 << 0, 1 << 5),
+    "Bold Italic": ((1 << 0) | (1 << 1), (1 << 5) | (1 << 0)),
+}
 EDGE_JOIN_REQUIREMENTS = {
     0x2500: (True, True),  # BOX DRAWINGS LIGHT HORIZONTAL
     0x2588: (True, True),  # FULL BLOCK
@@ -77,6 +87,45 @@ def _check_vertical_metrics(font: TTFont) -> list[str]:
     return errors
 
 
+def _check_ribbi_metadata(font: TTFont, *, enforce_gdi_length: bool = True) -> list[str]:
+    """RIBBI 스타일 이름, 플래그 일관성, 잔여 원본 이름 제거를 확인한다."""
+    errors: list[str] = []
+    legacy_families = _name_values(font, 1)
+    if enforce_gdi_length:
+        too_long = [value for value in sorted(legacy_families) if len(value) > 31]
+        if too_long:
+            errors.append(f"name ID 1 길이가 31자를 넘습니다: {too_long}")
+
+    subfamilies = _name_values(font, 2)
+    if len(subfamilies) != 1 or not subfamilies.issubset(RIBBI_SUBFAMILIES):
+        errors.append(f"name ID 2가 RIBBI 규칙과 다릅니다: {sorted(subfamilies)}")
+    else:
+        subfamily = next(iter(subfamilies))
+        expected_mac, expected_fs_style = RIBBI_SUBFAMILIES[subfamily]
+        actual_mac = font["head"].macStyle & 0x3
+        actual_fs_style = font["OS/2"].fsSelection & ((1 << 0) | (1 << 5) | (1 << 6))
+        if actual_mac != expected_mac:
+            errors.append(
+                f"head.macStyle=0x{actual_mac:x}, expected=0x{expected_mac:x} ({subfamily})"
+            )
+        if actual_fs_style != expected_fs_style:
+            errors.append(
+                f"OS/2.fsSelection 스타일 비트=0x{actual_fs_style:x}, "
+                f"expected=0x{expected_fs_style:x} ({subfamily})"
+            )
+
+    if not (font["OS/2"].fsSelection & (1 << 7)):
+        errors.append("OS/2.fsSelection에 USE_TYPO_METRICS 비트가 설정되지 않았습니다.")
+
+    for name_id, label in ((18, "Compatible Full"), (19, "Sample Text")):
+        values = _name_values(font, name_id)
+        if not values or any("Monaspace" in value for value in values):
+            errors.append(
+                f"name ID {name_id} ({label})에 원본 이름이 남아 있습니다: {sorted(values)}"
+            )
+    return errors
+
+
 def verify_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
     """한 글꼴을 검사하고 실패 사유를 반환한다."""
     profile = profile or load_profile()
@@ -122,14 +171,23 @@ def verify_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
                     f"영문 advance={latin_advance}, expected={expected_advance} "
                     f"({profile.latin_advance_em:.3f}em)"
                 )
-            for codepoint in REQUIRED_HANGUL:
+            for codepoint in (*REQUIRED_HANGUL, *REQUIRED_WIDE_CJK):
                 glyph_name = cmap.get(codepoint)
                 if glyph_name is None:
-                    errors.append(f"필수 한글 글리프 누락: U+{codepoint:04X}")
+                    errors.append(f"필수 2칸 한글·CJK 글리프 누락: U+{codepoint:04X}")
                 elif hmtx[glyph_name][0] != latin_advance * 2:
                     errors.append(
                         f"U+{codepoint:04X} advance={hmtx[glyph_name][0]}, "
                         f"expected={latin_advance * 2}"
+                    )
+            for codepoint in REQUIRED_HALFWIDTH_CJK:
+                glyph_name = cmap.get(codepoint)
+                if glyph_name is None:
+                    errors.append(f"필수 1칸 반각·기호 글리프 누락: U+{codepoint:04X}")
+                elif hmtx[glyph_name][0] != latin_advance:
+                    errors.append(
+                        f"U+{codepoint:04X} advance={hmtx[glyph_name][0]}, "
+                        f"expected={latin_advance}"
                     )
 
             glyph_set = font.getGlyphSet()
@@ -168,6 +226,9 @@ def verify_font(path: Path, profile: BuildProfile | None = None) -> list[str]:
             errors.extend(_check_latin_hinting(font, cmap))
 
         errors.extend(_check_vertical_metrics(font))
+        errors.extend(
+            _check_ribbi_metadata(font, enforce_gdi_length=profile.name == DEFAULT_PROFILE)
+        )
 
         if not cast_fixed_pitch(font):
             errors.append("고정폭 메타데이터가 설정되지 않았습니다.")
@@ -195,7 +256,7 @@ def verify_nerd_font(path: Path, profile: BuildProfile | None = None) -> list[st
         hmtx = font["hmtx"].metrics
         ascii_glyph = cmap.get(ord("A"))
         latin_advance = hmtx[ascii_glyph][0] if ascii_glyph in hmtx else None
-        for codepoint in REQUIRED_NERD_CODEPOINTS:
+        for codepoint in (*REQUIRED_NERD_CODEPOINTS, *REQUIRED_NERD_NON_PUA_CODEPOINTS):
             glyph_name = cmap.get(codepoint)
             if glyph_name is None:
                 errors.append(f"필수 Nerd 아이콘 누락: U+{codepoint:04X}")

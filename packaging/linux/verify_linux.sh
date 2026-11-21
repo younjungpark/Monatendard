@@ -29,10 +29,13 @@ if command -v shellcheck >/dev/null 2>&1; then
     shellcheck "$INSTALLER" "${SCRIPT_DIR}/verify_linux.sh"
 fi
 
-# 1. Help, version, and dry-run leave disk clean.
+# 1. Help, version, status, and dry-run leave disk clean.
 bash "$INSTALLER" --help >/dev/null
 VERSION_OUT="$(bash "$INSTALLER" --version)"
 [[ "$VERSION_OUT" == *"Monatendard Linux installer"* ]]
+STATUS_EMPTY="$(bash "$INSTALLER" --status)"
+[[ "$STATUS_EMPTY" == *"Monatendard: not installed"* ]]
+[[ "$STATUS_EMPTY" == *"Monatendard Nerd Font Mono: not installed"* ]]
 bash "$INSTALLER" --all --dry-run >/dev/null
 [[ ! -e "${FONT_ROOT}/monatendard" && ! -e "${FONT_ROOT}/monatendard-nerd" ]]
 
@@ -43,9 +46,13 @@ for style in "${STYLES[@]}"; do
 done
 test -f "${FONT_ROOT}/monatendard/.monatendard-managed"
 fc-list : family | grep -Fx "Monatendard" >/dev/null
+STATUS_STD="$(bash "$INSTALLER" --status)"
+[[ "$STATUS_STD" == *"Monatendard: installed (managed,"*"up-to-date)"* ]]
 
 # 3. Simulated upgrade from older managed marker updates cleanly.
 sed -i 's/^version=.*/version=0.0.0/' "${FONT_ROOT}/monatendard/.monatendard-managed"
+STATUS_OUTDATED="$(bash "$INSTALLER" --status)"
+[[ "$STATUS_OUTDATED" == *"update available:"* ]]
 bash "$INSTALLER"
 if grep -Fx "version=0.0.0" "${FONT_ROOT}/monatendard/.monatendard-managed" >/dev/null; then
     echo "FAIL: Expected upgrade to replace old managed marker version" >&2
@@ -59,6 +66,8 @@ for style in "${STYLES[@]}"; do
     test -s "${FONT_ROOT}/monatendard-nerd/MonatendardNFM-${style}.ttf"
 done
 fc-list : family | grep -Fx "Monatendard Nerd Font Mono" >/dev/null
+STATUS_NERD="$(bash "$INSTALLER" --nerd --status)"
+[[ "$STATUS_NERD" == *"Monatendard Nerd Font Mono: installed (managed,"*"up-to-date)"* ]]
 
 # 5. External manual installation conflict blocks install without touching managed dirs.
 mkdir -p "${FONT_ROOT}/manual-conflict"

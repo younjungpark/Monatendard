@@ -99,6 +99,38 @@ brew upgrade --cask font-monatendard font-monatendard-nerd-font
 brew uninstall --cask font-monatendard font-monatendard-nerd-font
 ```
 
+### Linux
+
+`fontconfig` 기반 데스크톱 Linux에서 현재 사용자 영역(`${XDG_DATA_HOME:-$HOME/.local/share}/fonts`)에
+설치합니다. `root`/`sudo` 실행은 지원하지 않으며 `bash`, `fc-cache`, `unzip`, `sha256sum`,
+`curl`(또는 `wget`)이 필요합니다.
+
+```sh
+# 일반판 설치 또는 최신 정식 버전으로 업데이트
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash
+
+# Nerd판 설치 또는 업데이트
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --nerd
+
+# 두 패밀리 모두 설치 또는 업데이트
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --all
+```
+
+설치 상태 확인과 제거는 다음 명령을 사용합니다.
+
+```sh
+# 설치 상태·버전 확인
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --status
+
+# 관리 설치본 제거 (일반판 / Nerd판 / 전체)
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --nerd --uninstall
+curl -fsSL https://raw.githubusercontent.com/younjungpark/Monatendard/main/packaging/linux/install.sh | bash -s -- --all --uninstall
+```
+
+설치 후 편집기나 터미널을 다시 시작하고 `Monatendard` 또는 `Monatendard Nerd Font Mono`를 선택하세요.
+수동 설치본 충돌 처리, `--dry-run`, 실패 시 복구 절차는 [Linux 배포 문서](packaging/linux/README.md)를 참고하세요.
+
 ## 개발자 빌드
 
 필요 조건은 Python 3.11 이상과 [uv](https://docs.astral.sh/uv/)입니다.
@@ -160,7 +192,7 @@ uv run monatendard verify --profile compact --nerd
 - `monatendard build-nerd`: 일반판에 고정된 Nerd Fonts Symbols Only 아이콘을 병합합니다.
 - `monatendard verify`: 이름, 폭, 한글 글리프, 리게이처, 테이블 무결성을 확인합니다.
 - `monatendard verify --nerd`: Nerd 패밀리명, 필수 아이콘과 한 칸 폭을 추가 검사합니다.
-- `monatendard package --version 0.3.1`: Desktop/Desktop-Nerd/Web ZIP과 체크섬을 만듭니다.
+- `monatendard package --version 0.4.0`: Desktop/Desktop-Nerd/Web ZIP과 체크섬을 만듭니다.
 
 `Makefile`은 개발자용 단축 명령일 뿐이며 사용자 설치 과정에는 필요하지 않습니다.
 
@@ -168,10 +200,10 @@ uv run monatendard verify --profile compact --nerd
 
 | 항목 | 값 |
 |---|---|
-| Monatendard | 0.3.1 |
+| Monatendard | 0.4.0 |
 | Monaspace Neon | 1.400 |
 | Pretendard | 1.3.9 |
-| Nerd Fonts Symbols Only | 3.4.0 |
+| Nerd Fonts Symbols Only | 3.5.1 |
 
 원본 URL과 아카이브 SHA256은 `sources.lock.toml`이 유일한 기준입니다. 같은 잠금 파일과
 도구 버전으로 만든 결과의 바이트 재현성도 테스트합니다.

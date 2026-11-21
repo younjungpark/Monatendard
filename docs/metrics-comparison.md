@@ -42,14 +42,6 @@
 - **남은 차이는 영문이다.** Monaspace의 x-height(0.5135)가 JetBrains Mono(0.550)보다 낮아서, 같은 한글이 Monatendard 계열에서 영문 대비 조금 커 보인다(1.93 대 1.80).
 - **Proto A와 C의 차이는 영문 처리와 셀 폭뿐이다.** 2026-10-05 Windows Terminal 15pt Light에서 둘은 거의 같아 보였다. 15pt(20px)에서는 0.620em(12.4px)과 0.600em(12px) 셀이 모두 12px로 반올림되는 것으로 보인다.
 
-## 시험판 설치 패키지
+## 시험판 설치 패키지 (판정 완료 · 기록용)
 
-`tools/package_proto.py`로 만든다. 먼저 `--all`로 14개 스타일을 빌드해야 한다.
-
-```sh
-uv run monatendard build --profile proto-a --all
-uv run monatendard build-nerd --profile proto-a --all
-uv run python tools/package_proto.py proto-a proto-c
-```
-
-결과는 `dist/Monatendard-Proto-{A,C}-0.3.0-proto-Nerd.zip`이다. 압축을 풀고 `install.cmd`를 실행하면 관리자 권한 없이 현재 사용자에게 설치된다.
+시제품 판정 당시(`2026-10-05`)에는 `tools/package_proto.py`로 `dist/Monatendard-Proto-{A,C}-0.3.0-proto-Nerd.zip`을 만들어 테스트했다. Proto A 확정(v0.3.0) 이후 시제품 스크립트와 `proto-*` 프로필은 정리되었으며, 현재 선택 빌드는 `--profile compact`로 통합되어 있다.

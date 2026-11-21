@@ -707,3 +707,88 @@ def test_managed_dir_tolerates_fontconfig_uuid_but_blocks_unknown_files(tmp_path
     res_unmanaged, _, _ = _run_installer(tmp_path, script, ["--uninstall"])
     assert res_unmanaged.returncode != 0
     assert unmanaged.exists()
+
+
+@requires_linux_bash
+def test_status_reports_not_installed_managed_outdated_manual_and_conflict(tmp_path: Path) -> None:
+    _, _, std_fonts = _cask_metadata(STANDARD_CASK)
+    _, _, nerd_fonts = _cask_metadata(NERD_CASK)
+    std_zip = tmp_path / "std.zip"
+    nerd_zip = tmp_path / "nerd.zip"
+    std_sha = _make_archive(std_zip, std_fonts, b"std-v1")
+    nerd_sha = _make_archive(nerd_zip, nerd_fonts, b"nerd-v1")
+    std_url = (
+        "https://github.com/younjungpark/Monatendard/releases/download/"
+        "v0.3.1/Monatendard-v0.3.1-Desktop.zip"
+    )
+    nerd_url = (
+        "https://github.com/younjungpark/Monatendard/releases/download/"
+        "v0.3.1/Monatendard-v0.3.1-Desktop-Nerd.zip"
+    )
+    script = _prepare_patched_installer(
+        tmp_path / "script", version="0.3.1", standard_sha=std_sha, nerd_sha=nerd_sha
+    )
+    archives = {std_url: std_zip, nerd_url: nerd_zip}
+
+    # Conflicting flag combinations with --status are rejected.
+    for bad_args in (
+        ["--status", "--uninstall"],
+        ["--uninstall", "--status"],
+        ["--status", "--dry-run"],
+        ["--status", "--help"],
+        ["--status", "--version"],
+    ):
+        res_bad, _, _ = _run_installer(tmp_path, script, bad_args)
+        assert res_bad.returncode != 0
+
+    # Works even without fc-cache, curl, unzip, or sha256sum when not installed.
+    res_empty, home_dir, _ = _run_installer(
+        tmp_path,
+        script,
+        ["--status"],
+        omit_tools={"fc-cache", "curl", "unzip", "sha256sum"},
+    )
+    assert res_empty.returncode == 0, res_empty.stderr
+    assert "Monatendard: not installed" in res_empty.stdout
+    assert "Monatendard Nerd Font Mono: not installed" in res_empty.stdout
+
+    # Managed standard install reports up-to-date; nerd remains not installed.
+    res_install, _, _ = _run_installer(tmp_path, script, [], archives=archives)
+    assert res_install.returncode == 0, res_install.stderr
+    res_up, _, _ = _run_installer(tmp_path, script, ["--status"])
+    assert res_up.returncode == 0, res_up.stderr
+    assert "Monatendard: installed (managed, v0.3.1, up-to-date)" in res_up.stdout
+    assert "Monatendard Nerd Font Mono: not installed" in res_up.stdout
+
+    # Older marker version reports update available.
+    marker = home_dir / ".local" / "share" / "fonts" / "monatendard" / ".monatendard-managed"
+    marker.write_text(
+        marker.read_text(encoding="utf-8").replace("version=0.3.1", "version=0.3.0"),
+        encoding="utf-8",
+        newline="\n",
+    )
+    res_outdated, _, _ = _run_installer(tmp_path, script, ["--status"])
+    assert res_outdated.returncode == 0, res_outdated.stderr
+    assert (
+        "Monatendard: installed (managed, v0.3.0, update available: v0.3.1)"
+        in res_outdated.stdout
+    )
+
+    # External manual files alongside managed dir report conflict; manual-only reports manual.
+    fonts_root = home_dir / ".local" / "share" / "fonts"
+    conflict_file = fonts_root / "custom" / "Monatendard-Regular.ttf"
+    conflict_file.parent.mkdir(parents=True, exist_ok=True)
+    conflict_file.write_bytes(b"manual-std")
+    manual_nerd = fonts_root / "custom" / "MonatendardNFM-Regular.ttf"
+    manual_nerd.write_bytes(b"manual-nerd")
+
+    res_conflict, _, _ = _run_installer(tmp_path, script, ["--all", "--status"])
+    assert res_conflict.returncode == 0, res_conflict.stderr
+    assert "Monatendard: conflict (managed v0.3.0" in res_conflict.stdout
+    assert "Monatendard Nerd Font Mono: manual installation detected" in res_conflict.stdout
+
+    res_nerd_only, _, _ = _run_installer(tmp_path, script, ["--nerd", "--status"])
+    assert res_nerd_only.returncode == 0, res_nerd_only.stderr
+    assert "Monatendard Nerd Font Mono: manual installation detected" in res_nerd_only.stdout
+    assert "Monatendard: conflict" not in res_nerd_only.stdout
+
