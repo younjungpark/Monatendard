@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Pinned official stable release metadata (updated by packaging/linux/update_linux.py).
-RELEASE_VERSION="0.3.1"
-STANDARD_URL="https://github.com/younjungpark/Monatendard/releases/download/v0.3.1/Monatendard-v0.3.1-Desktop.zip"
-STANDARD_SHA256="c05361791d11dfac3d666e7bba7bbd09fca89cf1ac741f488a79da3ca0f56d49"
-NERD_URL="https://github.com/younjungpark/Monatendard/releases/download/v0.3.1/Monatendard-v0.3.1-Desktop-Nerd.zip"
-NERD_SHA256="89323c8a69b8f821c62197c5ee59f9ccbd54ac924bba9612f7eb657a8a7a4ba5"
+RELEASE_VERSION="0.4.0"
+STANDARD_URL="https://github.com/younjungpark/Monatendard/releases/download/v0.4.0/Monatendard-v0.4.0-Desktop.zip"
+STANDARD_SHA256="fe514af8d973ab664beb5395591331d2201bb9b9b909758ca2e1b3a805b63cc9"
+NERD_URL="https://github.com/younjungpark/Monatendard/releases/download/v0.4.0/Monatendard-v0.4.0-Desktop-Nerd.zip"
+NERD_SHA256="0137cc1de55ddd9a93440bcb346f3c00ed3ed9600eb5efaa36185e6d260f2311"
 
 STANDARD_FONTS=(
     "fonts/Monatendard-Bold.ttf"
