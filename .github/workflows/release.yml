@@ -66,3 +66,10 @@ jobs:
     uses: ./.github/workflows/update-font-scoop.yml
     with:
       tag: v${{ needs.build-release.outputs.version }}
+
+  update-font-linux:
+    needs: build-release
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    uses: ./.github/workflows/update-font-linux.yml
+    with:
+      tag: v${{ needs.build-release.outputs.version }}

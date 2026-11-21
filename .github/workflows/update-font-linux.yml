@@ -1,0 +1,94 @@
+name: Update Linux installer
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "게시가 완료된 정식 릴리스 태그"
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "정식 릴리스 태그 (비우면 최신 정식 릴리스)"
+        type: string
+      source_repository:
+        description: "릴리스 파일을 가져올 저장소 owner/name (비우면 현재 저장소)"
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-font-linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 갱신 대상 브랜치 결정
+        id: target
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$EVENT" == "workflow_dispatch" && "$REF_TYPE" == "branch" ]]; then
+            echo "base=$REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$DEFAULT_BRANCH" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.base }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: 공식 ZIP 체크섬 검증 및 Linux 설치기 갱신
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPOSITORY: ${{ inputs.source_repository || github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          args=(packaging/linux/update_linux.py --repository "$SOURCE_REPOSITORY")
+          if [[ -n "$RELEASE_TAG" ]]; then
+            args+=(--tag "$RELEASE_TAG")
+          fi
+          python "${args[@]}"
+      - name: shellcheck 및 Linux 설치기 E2E 검사
+        run: |
+          shellcheck packaging/linux/install.sh packaging/linux/verify_linux.sh
+          bash packaging/linux/verify_linux.sh
+      - name: 검증 완료 PR 생성 또는 갱신
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ github.token }}
+          base: ${{ steps.target.outputs.base }}
+          branch: automation/linux-${{ steps.update.outputs.version }}
+          add-paths: packaging/linux/install.sh
+          commit-message: "chore: update Linux installer to ${{ steps.update.outputs.version }}"
+          title: "Linux 설치기 ${{ steps.update.outputs.version }} 갱신"
+          body: |
+            공식 정식 릴리스의 Desktop·Nerd ZIP과 SHA256SUMS를 대조해 Linux 설치기의 버전과 체크섬을 갱신합니다.
+
+            이 PR을 생성하기 전에 동일한 Ubuntu job에서 공식 SHA256SUMS.txt 대조,
+            ZIP 무결성과 TTF 14개 구성, shellcheck, 두 패밀리의 설치·업데이트·공존·충돌 차단·제거 검사를 통과했습니다.
+            실제 편집기·터미널 렌더링과 Ubuntu 외 배포판 동작은 자동 검증에 포함되지 않습니다.
+
+            검증 실행: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: 실행 결과 기록
+        env:
+          VERSION: ${{ steps.update.outputs.version }}
+          CHANGED: ${{ steps.update.outputs.changed }}
+        run: |
+          echo "검증 버전: $VERSION / Linux 설치기 변경: $CHANGED" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$CHANGED" != "true" ]]; then
+            echo "이미 같은 Linux 설치기입니다. 추가 PR을 만들지 않았습니다." >> "$GITHUB_STEP_SUMMARY"
+          fi

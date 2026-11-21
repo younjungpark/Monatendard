@@ -1,0 +1,47 @@
+name: Linux installer
+
+on:
+  pull_request:
+    paths:
+      - "packaging/linux/**"
+      - "Casks/**"
+      - ".github/workflows/linux-installer.yml"
+      - ".github/workflows/update-font-linux.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packaging/linux/**"
+      - "Casks/**"
+      - ".github/workflows/linux-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Run shellcheck on Linux packaging scripts
+        run: shellcheck packaging/linux/install.sh packaging/linux/verify_linux.sh
+      - name: Verify installer matches published release checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          version="$(sed -n 's/^RELEASE_VERSION="\([^"]*\)"$/\1/p' packaging/linux/install.sh)"
+          if [[ -z "$version" ]]; then
+            echo "Failed to parse RELEASE_VERSION from packaging/linux/install.sh" >&2
+            exit 1
+          fi
+          python packaging/linux/update_linux.py --repository "$REPOSITORY" --tag "v${version}"
+          git diff --exit-code -- packaging/linux/install.sh
+      - name: Verify official install, upgrade, coexistence, conflict, and uninstall
+        run: bash packaging/linux/verify_linux.sh
