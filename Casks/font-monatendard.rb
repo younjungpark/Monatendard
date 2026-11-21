@@ -1,6 +1,6 @@
 cask "font-monatendard" do
-  version "0.3.1"
-  sha256 "c05361791d11dfac3d666e7bba7bbd09fca89cf1ac741f488a79da3ca0f56d49"
+  version "0.4.0"
+  sha256 "fe514af8d973ab664beb5395591331d2201bb9b9b909758ca2e1b3a805b63cc9"
 
   url "https://github.com/younjungpark/Monatendard/releases/download/v#{version}/Monatendard-v#{version}-Desktop.zip"
   name "Monatendard"
