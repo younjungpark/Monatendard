@@ -275,11 +275,13 @@ def test_help_version_and_invalid_options(tmp_path: Path) -> None:
     assert "--nerd" in help_res.stdout
     assert "--all" in help_res.stdout
     assert "--uninstall" in help_res.stdout
+    assert "--status" in help_res.stdout
     assert "--dry-run" in help_res.stdout
 
+    expected_version, _, _ = _cask_metadata(STANDARD_CASK)
     ver_res, _, _ = _run_installer(tmp_path, INSTALLER, ["--version"])
     assert ver_res.returncode == 0
-    assert "0.3.1" in ver_res.stdout
+    assert expected_version in ver_res.stdout
 
     for bad_args in [
         ["--unknown"],
