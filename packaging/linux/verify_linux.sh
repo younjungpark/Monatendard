@@ -47,7 +47,10 @@ fc-list : family | grep -Fx "Monatendard" >/dev/null
 # 3. Simulated upgrade from older managed marker updates cleanly.
 sed -i 's/^version=.*/version=0.0.0/' "${FONT_ROOT}/monatendard/.monatendard-managed"
 bash "$INSTALLER"
-! grep -Fx "version=0.0.0" "${FONT_ROOT}/monatendard/.monatendard-managed"
+if grep -Fx "version=0.0.0" "${FONT_ROOT}/monatendard/.monatendard-managed" >/dev/null; then
+    echo "FAIL: Expected upgrade to replace old managed marker version" >&2
+    exit 1
+fi
 
 # 4. Nerd install coexists alongside Standard and registers with fontconfig.
 bash "$INSTALLER" --nerd
